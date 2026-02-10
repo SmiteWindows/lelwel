@@ -1,4 +1,4 @@
-use lsp_types::*;
+use ls_types::*;
 
 use super::lookup::*;
 use crate::frontend::ast::{AstNode, File, Name, Named};

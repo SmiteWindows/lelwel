@@ -3,7 +3,7 @@
 use crate::{Parser, SemanticPass, Span};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
-use lsp_types::*;
+use ls_types::*;
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
@@ -225,7 +225,7 @@ fn to_lsp_diag(
     Diagnostic::new(
         diag.labels
             .first()
-            .map_or(lsp_types::Range::default(), |label| {
+            .map_or(ls_types::Range::default(), |label| {
                 compat::span_to_range(file, &label.range)
             }),
         Some(match diag.severity {
@@ -265,20 +265,20 @@ mod compat {
     use crate::Span;
     use codespan_reporting::files::SimpleFile;
 
-    pub fn position_to_offset(file: &SimpleFile<&str, &str>, pos: &lsp_types::Position) -> usize {
+    pub fn position_to_offset(file: &SimpleFile<&str, &str>, pos: &ls_types::Position) -> usize {
         codespan_lsp::position_to_byte_index(
             file,
             (),
-            &lsp_types::Position::new(pos.line, pos.character),
+            &ls_types::Position::new(pos.line, pos.character),
         )
         .unwrap()
     }
 
-    pub fn span_to_range(file: &SimpleFile<&str, &str>, span: &Span) -> lsp_types::Range {
+    pub fn span_to_range(file: &SimpleFile<&str, &str>, span: &Span) -> ls_types::Range {
         let range = codespan_lsp::byte_span_to_range(file, (), span.clone()).unwrap();
-        lsp_types::Range::new(
-            lsp_types::Position::new(range.start.line, range.start.character),
-            lsp_types::Position::new(range.end.line, range.end.character),
+        ls_types::Range::new(
+            ls_types::Position::new(range.start.line, range.start.character),
+            ls_types::Position::new(range.end.line, range.end.character),
         )
     }
 }

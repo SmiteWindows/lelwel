@@ -85,11 +85,12 @@ impl Parser<'_> {
                 }
                 Token::Gt => {
                     if let Some((pending_pos, pending_nesting_depth)) = pending.last().copied()
-                        && pending_nesting_depth == nesting_depth {
-                            pending.pop();
-                            self.context.template_start.insert(pending_pos);
-                            self.context.template_end.insert(self.pos + offset);
-                        }
+                        && pending_nesting_depth == nesting_depth
+                    {
+                        pending.pop();
+                        self.context.template_start.insert(pending_pos);
+                        self.context.template_end.insert(self.pos + offset);
+                    }
                 }
                 _ => {}
             }

@@ -192,13 +192,14 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
                     .unwrap()
                     .declared_names
                     .insert(name, is_type)
-                    && was_type != is_type {
-                        diags.push(
-                            Diagnostic::error()
-                                .with_message("redeclaration as different kind of symbol")
-                                .with_label(Label::primary((), name_span)),
-                        );
-                    }
+                && was_type != is_type
+            {
+                diags.push(
+                    Diagnostic::error()
+                        .with_message("redeclaration as different kind of symbol")
+                        .with_label(Label::primary((), name_span)),
+                );
+            }
             let direct_decl = decl.direct_declarator(&self.cst);
             if !matches!(direct_decl, Some(DirectDeclarator::ParenDeclarator(_))) {
                 self.context.last_seen_declarator = Some(decl);
@@ -214,13 +215,14 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
                 .unwrap()
                 .declared_names
                 .insert(name, false)
-                && was_type {
-                    diags.push(
-                        Diagnostic::error()
-                            .with_message("redeclaration as different kind of symbol")
-                            .with_label(Label::primary((), name_span)),
-                    );
-                }
+            && was_type
+        {
+            diags.push(
+                Diagnostic::error()
+                    .with_message("redeclaration as different kind of symbol")
+                    .with_label(Label::primary((), name_span)),
+            );
+        }
     }
 
     fn predicate_postfix_expr_1(&self) -> bool {
@@ -513,19 +515,19 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
                 .context
                 .first_declarator_in_list
                 .and_then(|decl| decl.name(&self.cst))
-            {
-                diags.push(
-                    Diagnostic::error()
-                        .with_message("typedef in function definition")
-                        .with_label(Label::primary((), typedef_span.clone())),
-                );
-                self.context
-                    .scopes
-                    .last_mut()
-                    .unwrap()
-                    .declared_names
-                    .remove(name);
-            }
+        {
+            diags.push(
+                Diagnostic::error()
+                    .with_message("typedef in function definition")
+                    .with_label(Label::primary((), typedef_span.clone())),
+            );
+            self.context
+                .scopes
+                .last_mut()
+                .unwrap()
+                .declared_names
+                .remove(name);
+        }
         // use last parameter scope for compound statement of function definition
         self.context.scopes.push(std::mem::replace(
             &mut self.context.last_parameter_scope,

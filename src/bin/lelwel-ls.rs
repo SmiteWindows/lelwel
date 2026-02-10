@@ -3,8 +3,7 @@
 use std::error::Error;
 
 use lelwel::ide::Cache;
-use lsp_server::{Connection, ExtractError, Message, Notification, RequestId, Response};
-use lsp_types::{
+use ls_types::{
     CompletionOptions, GotoDefinitionResponse, Hover, HoverContents, HoverProviderCapability,
     InitializeParams, MarkupContent, MarkupKind, OneOf, PublishDiagnosticsParams,
     ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
@@ -13,6 +12,7 @@ use lsp_types::{
     },
     request::{Completion, GotoDefinition, HoverRequest, References},
 };
+use lsp_server::{Connection, ExtractError, Message, Notification, RequestId, Response};
 
 macro_rules! request_match {
     ( $req_ty:ty, $cache:expr, $connection:expr, $req:expr ) => {
@@ -45,10 +45,10 @@ macro_rules! notification_match {
     };
 }
 
-trait RequestHandler: lsp_types::request::Request {
+trait RequestHandler: ls_types::request::Request {
     fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result;
 }
-trait NotificationHandler: lsp_types::notification::Notification {
+trait NotificationHandler: ls_types::notification::Notification {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification>;
 }
 
@@ -56,14 +56,14 @@ fn cast_request<R>(
     req: lsp_server::Request,
 ) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>
 where
-    R: lsp_types::request::Request,
+    R: ls_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
 {
     req.extract(R::METHOD)
 }
 fn cast_notification<N>(noti: Notification) -> Result<N::Params, ExtractError<Notification>>
 where
-    N: lsp_types::notification::Notification,
+    N: ls_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,
 {
     noti.extract(N::METHOD)
@@ -176,7 +176,7 @@ impl NotificationHandler for DidOpenTextDocument {
         let result = PublishDiagnosticsParams::new(uri, diagnostics, None);
         let params = serde_json::to_value(&result).unwrap();
         let method =
-            <PublishDiagnostics as lsp_types::notification::Notification>::METHOD.to_string();
+            <PublishDiagnostics as ls_types::notification::Notification>::METHOD.to_string();
         Some(Notification { method, params })
     }
 }
@@ -193,7 +193,7 @@ impl NotificationHandler for DidChangeTextDocument {
         let result = PublishDiagnosticsParams::new(uri, diagnostics, None);
         let params = serde_json::to_value(&result).unwrap();
         let method =
-            <PublishDiagnostics as lsp_types::notification::Notification>::METHOD.to_string();
+            <PublishDiagnostics as ls_types::notification::Notification>::METHOD.to_string();
         Some(Notification { method, params })
     }
 }
