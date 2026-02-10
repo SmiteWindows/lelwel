@@ -13,12 +13,12 @@ rust-version="1.93"
 rust-2018-idioms = { level = "deny" }
 
 [dependencies]
-logos = "0.16"
-codespan-reporting = "0.13"
-codespan-lsp = { version = "0.13", optional = true }
-clap = { version = "4.5", features = ["cargo"], optional = true }
-ls-types = { version = "0.0.3", optional = true }
+logos = { git = "https://github.com/SmiteWindows/logos" }
+codespan-reporting = { git = "https://github.com/SmiteWindows/codespan", branch = "master" }
+codespan-lsp = { git = "https://github.com/SmiteWindows/codespan", branch = "master", optional = true }
+ls-types = { git = "https://github.com/SmiteWindows/ls-types", optional = true }
 lsp-server = { version = "0.7", optional = true }
+clap = { version = "4.5", features = ["cargo"], optional = true }
 serde = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
