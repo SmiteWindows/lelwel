@@ -194,21 +194,19 @@ fn check_escape(
         Some((i, mut c @ ('\n' | '\r' | '\x20' | '\x09'))) if is_ml => {
             let mut j = i;
             while c != '\n' {
-                if c == '\x20' || c == '\x09' {
-                    if let Some((k, n)) = it.next() {
+                if (c == '\x20' || c == '\x09')
+                    && let Some((k, n)) = it.next() {
                         c = n;
                         j = k;
                         continue;
                     }
-                }
-                if c == '\r' {
-                    if let Some((k, n)) = it.next() {
+                if c == '\r'
+                    && let Some((k, n)) = it.next() {
                         if n == '\n' {
                             break;
                         }
                         j = k;
                     }
-                }
                 diags.push(
                     Diagnostic::error()
                         .with_message("invalid escape sequence")
@@ -233,11 +231,10 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>, is_ml: bo
         match c {
             '\\' if !is_lit => check_escape(&mut it, value, span, diags, is_ml),
             '\r' => {
-                if let Some((_, c)) = it.next() {
-                    if c == '\n' {
+                if let Some((_, c)) = it.next()
+                    && c == '\n' {
                         continue;
                     }
-                }
                 diags.push(
                     Diagnostic::error()
                         .with_message(format!("string contains invalid character {c:?}"))

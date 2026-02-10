@@ -269,7 +269,7 @@ mod compat {
         codespan_lsp::position_to_byte_index(
             file,
             (),
-            &lsp_types_old::Position::new(pos.line, pos.character),
+            &lsp_types::Position::new(pos.line, pos.character),
         )
         .unwrap()
     }

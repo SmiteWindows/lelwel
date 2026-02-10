@@ -184,24 +184,21 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
         let decl = Declarator::cast(&self.cst, node);
         if let Some(decl) = decl {
             let is_type = self.context.in_typedef.last().unwrap().is_some();
-            if let Some((name, name_span)) = decl.name(&self.cst) {
-                if let Some(was_type) = self
+            if let Some((name, name_span)) = decl.name(&self.cst)
+                && let Some(was_type) = self
                     .context
                     .scopes
                     .last_mut()
                     .unwrap()
                     .declared_names
                     .insert(name, is_type)
-                {
-                    if was_type != is_type {
+                    && was_type != is_type {
                         diags.push(
                             Diagnostic::error()
                                 .with_message("redeclaration as different kind of symbol")
                                 .with_label(Label::primary((), name_span)),
                         );
                     }
-                }
-            }
             let direct_decl = decl.direct_declarator(&self.cst);
             if !matches!(direct_decl, Some(DirectDeclarator::ParenDeclarator(_))) {
                 self.context.last_seen_declarator = Some(decl);
@@ -210,24 +207,20 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
     }
     fn create_node_enumerator(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = Enumerator::cast(&self.cst, node).unwrap().name(&self.cst)
-        {
-            if let Some(was_type) = self
+            && let Some(was_type) = self
                 .context
                 .scopes
                 .last_mut()
                 .unwrap()
                 .declared_names
                 .insert(name, false)
-            {
-                if was_type {
+                && was_type {
                     diags.push(
                         Diagnostic::error()
                             .with_message("redeclaration as different kind of symbol")
                             .with_label(Label::primary((), name_span)),
                     );
                 }
-            }
-        }
     }
 
     fn predicate_postfix_expr_1(&self) -> bool {
@@ -515,8 +508,8 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
         self.context.first_declarator_in_list = self.context.last_seen_declarator;
     }
     fn action_external_declaration_3(&mut self, diags: &mut Vec<Diagnostic>) {
-        if let Some(typedef_span) = self.context.in_typedef.last().unwrap() {
-            if let Some((name, _name_span)) = self
+        if let Some(typedef_span) = self.context.in_typedef.last().unwrap()
+            && let Some((name, _name_span)) = self
                 .context
                 .first_declarator_in_list
                 .and_then(|decl| decl.name(&self.cst))
@@ -533,7 +526,6 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
                     .declared_names
                     .remove(name);
             }
-        }
         // use last parameter scope for compound statement of function definition
         self.context.scopes.push(std::mem::replace(
             &mut self.context.last_parameter_scope,

@@ -84,13 +84,12 @@ impl Parser<'_> {
                     pending.push((self.pos + offset, nesting_depth));
                 }
                 Token::Gt => {
-                    if let Some((pending_pos, pending_nesting_depth)) = pending.last().copied() {
-                        if pending_nesting_depth == nesting_depth {
+                    if let Some((pending_pos, pending_nesting_depth)) = pending.last().copied()
+                        && pending_nesting_depth == nesting_depth {
                             pending.pop();
                             self.context.template_start.insert(pending_pos);
                             self.context.template_end.insert(self.pos + offset);
                         }
-                    }
                 }
                 _ => {}
             }

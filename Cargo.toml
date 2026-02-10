@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
-
+rust-version="1.93"
 [lints.rust]
 rust-2018-idioms = { level = "deny" }
 
