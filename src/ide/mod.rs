@@ -24,11 +24,11 @@ struct Analyzer {
 
 #[derive(Default)]
 pub struct Cache {
-    analyzers: HashMap<Url, Analyzer>,
+    analyzers: HashMap<Uri, Analyzer>,
 }
 
 impl Cache {
-    pub fn analyze(&mut self, uri: Url, text: String) {
+    pub fn analyze(&mut self, uri: Uri, text: String) {
         let (req_tx, req_rx) = mpsc::channel::<Request>();
         let (noti_tx, noti_rx) = mpsc::channel::<Notification>();
         let key = uri.clone();
@@ -43,13 +43,13 @@ impl Cache {
             },
         );
     }
-    pub fn invalidate(&mut self, uri: &Url) {
+    pub fn invalidate(&mut self, uri: &Uri) {
         if let Some(analyzer) = self.analyzers.remove(uri) {
             analyzer.req_tx.send(Request::Cancel).unwrap();
             analyzer.handle.join().unwrap();
         }
     }
-    pub fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
+    pub fn get_diagnostics(&mut self, uri: &Uri) -> Vec<Diagnostic> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::Diagnostic).unwrap();
@@ -59,7 +59,7 @@ impl Cache {
             vec![]
         }
     }
-    pub fn hover(&mut self, uri: &Url, pos: Position) -> Option<(String, Range)> {
+    pub fn hover(&mut self, uri: &Uri, pos: Position) -> Option<(String, Range)> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::Hover(pos)).unwrap();
@@ -69,7 +69,7 @@ impl Cache {
             None
         }
     }
-    pub fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Location> {
+    pub fn goto_definition(&mut self, uri: &Uri, pos: Position) -> Option<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::GotoDefinition(pos)).unwrap();
@@ -79,7 +79,7 @@ impl Cache {
             None
         }
     }
-    pub fn references(&mut self, uri: &Url, pos: Position, with_def: bool) -> Vec<Location> {
+    pub fn references(&mut self, uri: &Uri, pos: Position, with_def: bool) -> Vec<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer
@@ -125,7 +125,7 @@ enum Notification {
 }
 
 fn analyze(
-    uri: Url,
+    uri: Uri,
     source: String,
     req: mpsc::Receiver<Request>,
     noti: mpsc::Sender<Notification>,
@@ -186,7 +186,7 @@ fn analyze(
 fn to_lsp_related(
     file: &SimpleFile<&str, &str>,
     span: &Span,
-    uri: &Url,
+    uri: &Uri,
     msg: &str,
 ) -> DiagnosticRelatedInformation {
     DiagnosticRelatedInformation {
@@ -197,7 +197,7 @@ fn to_lsp_related(
 
 fn to_lsp_diag(
     file: &SimpleFile<&str, &str>,
-    uri: &Url,
+    uri: &Uri,
     diag: &super::frontend::parser::Diagnostic,
 ) -> Diagnostic {
     let related = diag

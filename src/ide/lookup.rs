@@ -1,5 +1,5 @@
 use codespan_reporting::files::{Files, SimpleFile};
-use ls_types::{Location, Url};
+use ls_types::*;
 
 use crate::frontend::lexer::Token;
 use crate::frontend::parser::Span;
@@ -47,7 +47,7 @@ pub fn lookup_definition(
     cst: &Cst<'_>,
     sema: &SemanticData<'_>,
     pos: usize,
-    uri: &Url,
+    uri: &Uri,
     file: &SimpleFile<&str, &str>,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
@@ -95,7 +95,7 @@ fn lookup_parser_impl_definition(
     number: &str,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
-    let uri = Url::from_file_path(parser_path).ok()?;
+    let uri = Uri::from_file_path(parser_path).ok()?;
     let source = std::fs::read_to_string(parser_path).ok()?;
     let file = SimpleFile::new(parser_path.to_str()?, source.as_str());
     source
