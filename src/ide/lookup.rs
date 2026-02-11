@@ -95,7 +95,7 @@ fn lookup_parser_impl_definition(
     number: &str,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
-    let uri = Uri::from_file_path(parser_path).ok()?;
+    let uri = Uri::from_file_path(parser_path)?;
     let source = std::fs::read_to_string(parser_path).ok()?;
     let file = SimpleFile::new(parser_path.to_str()?, source.as_str());
     source
