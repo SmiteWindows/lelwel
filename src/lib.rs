@@ -123,7 +123,12 @@ pub fn get_location(source: &str, start: usize, end: usize) -> Vec<usize> {
         end_loc.column_number,
     ]
 }
-pub fn format_llw_file(input: &str, output: &str) -> Result<bool, Box<dyn std::error::Error>> {
+
+pub fn format_llw_file(
+    input: &str,
+    output: &str,
+    preserve_comments: bool,
+) -> Result<bool, Box<dyn std::error::Error>> {
     use std::fs;
     use std::path::Path;
 
@@ -134,26 +139,31 @@ pub fn format_llw_file(input: &str, output: &str) -> Result<bool, Box<dyn std::e
     let cst = frontend::parser::Parser::new(&source, &mut diags).parse(&mut diags);
 
     // Format the llw file
-    if let Some(formatted) = frontend::format::format_llw(&cst) {
-        if output == "." {
+    let formatted = if preserve_comments {
+        // Use comment-preserving formatter
+        frontend::format::format_llw_with_comments(&source, &cst).unwrap_or_default()
+    } else {
+        // Use basic formatter
+        frontend::format::format_llw(&cst).unwrap_or_default()
+    };
+
+    // Handle output using iterator-style pattern matching
+    match Path::new(output) {
+        path if path.as_os_str() == "." => {
             // Print to stdout
             println!("{}", formatted);
             Ok(true)
-        } else {
-            // Write to file
-            let output_path = Path::new(output);
-            if output_path.is_dir() {
-                // Use the same filename in the output directory
-                let input_path = Path::new(input);
-                let output_file = output_path.join(input_path.file_name().unwrap());
-                fs::write(output_file, formatted)?;
-            } else {
-                // Write to specific file
-                fs::write(output_path, formatted)?;
-            }
+        }
+        path if path.is_dir() => {
+            // Use the same filename in the output directory
+            let output_file = path.join(Path::new(input).file_name().unwrap());
+            fs::write(output_file, formatted)?;
             Ok(true)
         }
-    } else {
-        Ok(false)
+        path => {
+            // Write to specific file
+            fs::write(path, formatted)?;
+            Ok(true)
+        }
     }
 }

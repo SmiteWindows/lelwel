@@ -9,6 +9,7 @@ fn main() {
         .about("Generates recursive descent parsers for Rust using LL(1) grammars.")
         .arg(arg!(-c --check "Only check the file for errors"))
         .arg(arg!(-f --format "Format the llw file"))
+        .arg(arg!(--preserve-comments "Preserve comments when formatting"))
         .arg(arg!(-g --graph "Output a graphviz file for the grammar"))
         .arg(arg!(-s --short "Use short diagnostics"))
         .arg(arg!(-v --verbose "Sets the level of verbosity").action(ArgAction::Count))
@@ -25,7 +26,8 @@ fn main() {
     let input = matches.get_one::<String>("INPUT").unwrap();
     let output = matches.get_one::<String>("output").unwrap();
     if matches.get_flag("format") {
-        match lelwel::format_llw_file(input, output) {
+        let preserve_comments = matches.get_flag("preserve-comments");
+        match lelwel::format_llw_file(input, output, preserve_comments) {
             Ok(success) => std::process::exit(if success { 0 } else { 1 }),
             Err(e) => cmd.error(ErrorKind::InvalidValue, format!("{e}")).exit(),
         }
