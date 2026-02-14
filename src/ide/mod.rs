@@ -107,8 +107,8 @@ pub struct LspConfig {
 impl Default for LspConfig {
     fn default() -> Self {
         Self {
-            format_preserve_comments: Some(false),
-            format_max_line_width: Some(80),
+            format_preserve_comments: Some(true),
+            format_max_line_width: Some(100),
             format_indent_size: Some(2),
             format_enable_wrapping: Some(true),
             format_compact_concat: Some(false),
