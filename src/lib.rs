@@ -18,7 +18,7 @@ pub mod backend;
 pub mod frontend;
 pub mod ide;
 
-const VERSION: &str = "0.10.1";
+const VERSION: &str = "0.10.2";
 
 pub fn build(path: &str) {
     let res = compile(
@@ -122,4 +122,38 @@ pub fn get_location(source: &str, start: usize, end: usize) -> Vec<usize> {
         end_loc.line_number,
         end_loc.column_number,
     ]
+}
+pub fn format_llw_file(input: &str, output: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    use std::fs;
+    use std::path::Path;
+
+    let source = fs::read_to_string(input)?;
+    let mut diags = vec![];
+
+    // Parse the llw file
+    let cst = frontend::parser::Parser::new(&source, &mut diags).parse(&mut diags);
+
+    // Format the llw file
+    if let Some(formatted) = frontend::format::format_llw(&cst) {
+        if output == "." {
+            // Print to stdout
+            println!("{}", formatted);
+            Ok(true)
+        } else {
+            // Write to file
+            let output_path = Path::new(output);
+            if output_path.is_dir() {
+                // Use the same filename in the output directory
+                let input_path = Path::new(input);
+                let output_file = output_path.join(input_path.file_name().unwrap());
+                fs::write(output_file, formatted)?;
+            } else {
+                // Write to specific file
+                fs::write(output_path, formatted)?;
+            }
+            Ok(true)
+        }
+    } else {
+        Ok(false)
+    }
 }

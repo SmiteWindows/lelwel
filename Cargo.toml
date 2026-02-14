@@ -1,6 +1,6 @@
 [package]
 name = "lelwel"
-version = "0.10.1"
+version = "0.10.2"
 description = "Resilient LL(1) parser generator"
 repository = "https://github.com/0x2a-42/lelwel"
 readme = "README.md"
@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
-rust-version="1.93"
+rust-version = "1.93"
 [lints.rust]
 rust-2018-idioms = { level = "deny" }
 
@@ -41,14 +41,14 @@ crate-type = ["lib", "cdylib"]
 
 [workspace]
 members = [
-    "examples/c",
-    "examples/calc",
-    "examples/json",
-    "examples/l",
-    "examples/lua",
-    "examples/oberon0",
-    "examples/python2",
-    "examples/toml",
-    "examples/wgsl",
-    "examples/brainfuck"
+  "examples/c",
+  "examples/calc",
+  "examples/json",
+  "examples/l",
+  "examples/lua",
+  "examples/oberon0",
+  "examples/python2",
+  "examples/toml",
+  "examples/wgsl",
+  "examples/brainfuck",
 ]
