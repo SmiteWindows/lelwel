@@ -106,6 +106,18 @@ trait NotificationHandler: ls_types::notification::Notification {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification>;
 }
 
+impl NotificationHandler for ls_types::notification::DidChangeConfiguration {
+    fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification> {
+        // 处理配置变更
+        if let Some(settings) = params.settings.get("lelwel") {
+            if let Ok(config) = serde_json::from_value::<lelwel::ide::LspConfig>(settings.clone()) {
+                cache.update_config(config);
+            }
+        }
+        None
+    }
+}
+
 fn cast_request<R>(
     req: lsp_server::Request,
 ) -> Result<(RequestId, R::Params), ExtractError<lsp_server::Request>>

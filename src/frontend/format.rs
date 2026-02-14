@@ -93,8 +93,9 @@ impl LlwFormatter {
                 });
 
         // Preserve any content after the last declaration using modern syntax
-        if let Some(remaining) = source
-            .get(last_position..) { self.extract_and_format_comments(remaining) }
+        if let Some(remaining) = source.get(last_position..) {
+            self.extract_and_format_comments(remaining)
+        }
 
         self.output.clone()
     }
