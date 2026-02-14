@@ -229,12 +229,12 @@ impl LlwFormatter {
 
     fn format_decl(&mut self, cst: &Cst<'_>, decl: &Decl) {
         match decl {
+            Decl::Rule(rule) => self.format_rule_decl(cst, *rule),
+            Decl::Part(part) => self.format_part_decl(cst, *part),
+            Decl::Token(token) => self.format_token_decl(cst, *token),
             Decl::Start(start) => self.format_start_decl(cst, *start),
             Decl::Right(right) => self.format_right_decl(cst, *right),
             Decl::Skip(skip) => self.format_skip_decl(cst, *skip),
-            Decl::Part(part) => self.format_part_decl(cst, *part),
-            Decl::Token(token) => self.format_token_decl(cst, *token),
-            Decl::Rule(rule) => self.format_rule_decl(cst, *rule),
         }
     }
 
@@ -335,8 +335,12 @@ impl LlwFormatter {
             let regex_width = self.estimate_regex_width(cst, &regex);
             let total_width = self.line_width + rule_header.len() + regex_width;
 
-            if self.should_wrap && total_width > self.max_line_width && regex_width > 20 {
-                // Multi-line format
+            // LLW files show rule declarations are usually single-line
+            // Only wrap if the regex is exceptionally long
+            let should_wrap = self.should_wrap && total_width > self.max_line_width + 40;
+
+            if should_wrap {
+                // Multi-line format (rarely used in LLW files)
                 self.write(&rule_header);
                 self.indent_level += 1;
                 self.writeln();
@@ -345,7 +349,7 @@ impl LlwFormatter {
                 self.writeln();
                 self.write(";");
             } else {
-                // Single-line format
+                // Single-line format (common in LLW files)
                 self.write(&rule_header);
                 self.format_regex(cst, regex);
                 self.write(";");
