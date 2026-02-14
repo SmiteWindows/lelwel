@@ -440,6 +440,10 @@ impl LlwFormatter {
                 self.write("&");
             }
         }
+
+        if needs_parentheses {
+            self.write(")");
+        }
     }
 
     fn format_operator_separated(
