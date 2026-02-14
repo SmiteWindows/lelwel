@@ -25,10 +25,12 @@ struct Analyzer {
 #[derive(Default)]
 pub struct Cache {
     analyzers: HashMap<Uri, Analyzer>,
+    documents: HashMap<Uri, String>,
 }
 
 impl Cache {
     pub fn analyze(&mut self, uri: Uri, text: String) {
+        self.documents.insert(uri.clone(), text.clone());
         let (req_tx, req_rx) = mpsc::channel::<Request>();
         let (noti_tx, noti_rx) = mpsc::channel::<Notification>();
         let key = uri.clone();
@@ -104,6 +106,9 @@ impl Cache {
         } else {
             None
         }
+    }
+    pub fn get_document(&self, uri: &Uri) -> Option<&String> {
+        self.documents.get(uri)
     }
 }
 

@@ -10,7 +10,7 @@ use ls_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
     },
-    request::{Completion, GotoDefinition, HoverRequest, References},
+    request::{Completion, Formatting, GotoDefinition, HoverRequest, References},
 };
 use lsp_server::{Connection, ExtractError, Message, Notification, RequestId, Response};
 
@@ -48,6 +48,51 @@ macro_rules! notification_match {
 trait RequestHandler: ls_types::request::Request {
     fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result;
 }
+
+impl RequestHandler for Formatting {
+    fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result {
+        use ls_types::{TextDocumentIdentifier, TextEdit};
+
+        let TextDocumentIdentifier { uri } = params.text_document;
+
+        // 获取文档内容
+        let Some(document) = cache.get_document(&uri) else {
+            return None;
+        };
+
+        // 解析文档
+        let mut diags = vec![];
+        let cst = lelwel::frontend::parser::Parser::new(&document, &mut diags).parse(&mut diags);
+
+        // 格式化文档
+        let Some(formatted_text) = lelwel::frontend::format::format_llw(&cst) else {
+            return None;
+        };
+
+        // 如果格式化后的文本与原始文本相同，返回空编辑
+        if formatted_text == *document {
+            return Some(vec![]);
+        }
+
+        // 创建文本编辑，替换整个文档
+        let text_edit = TextEdit {
+            range: ls_types::Range {
+                start: ls_types::Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: ls_types::Position {
+                    line: document.lines().count() as u32,
+                    character: 0,
+                },
+            },
+            new_text: formatted_text,
+        };
+
+        Some(vec![text_edit])
+    }
+}
+
 trait NotificationHandler: ls_types::notification::Notification {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification>;
 }
@@ -80,6 +125,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
     .unwrap();
@@ -107,6 +153,7 @@ fn main_loop(
                 request_match!(GotoDefinition, cache, connection, req.clone());
                 request_match!(References, cache, connection, req.clone());
                 request_match!(Completion, cache, connection, req.clone());
+                request_match!(Formatting, cache, connection, req.clone());
             }
             Message::Response(_resp) => {}
             Message::Notification(noti) => {
