@@ -5,6 +5,103 @@ use crate::frontend::ast::{AstNode, File, Name, Named};
 use crate::frontend::lexer::Token;
 use crate::{Cst, Node, NodeRef, Rule, SemanticData};
 
+/// 格式化相关的代码补全建议
+#[derive(Debug, Clone)]
+pub struct FormattingSuggestions {
+    pub suggestions: Vec<CompletionItem>,
+}
+
+impl FormattingSuggestions {
+    pub fn new() -> Self {
+        Self {
+            suggestions: Vec::new(),
+        }
+    }
+
+    /// 添加格式化配置建议
+    pub fn add_formatting_config_suggestions(&mut self) {
+        // 格式化配置选项
+        let config_options = vec![
+            ("format_preserve_comments", "是否保留注释", "true"),
+            ("format_max_line_width", "最大行宽", "80"),
+            ("format_indent_size", "缩进大小", "2"),
+            ("format_enable_wrapping", "启用智能换行", "true"),
+        ];
+
+        for (key, description, default) in config_options {
+            self.suggestions.push(CompletionItem {
+                label: key.to_string(),
+                kind: Some(CompletionItemKind::PROPERTY),
+                detail: Some(format!("{} (默认: {})", description, default)),
+                documentation: Some(Documentation::String(format!(
+                    "格式化配置选项: {}\\n默认值: {}",
+                    description, default
+                ))),
+                ..Default::default()
+            });
+        }
+    }
+
+    /// 添加正则表达式格式化建议
+    pub fn add_regex_formatting_suggestions(&mut self) {
+        let regex_suggestions = vec![
+            ("|", "交替运算符", "用于分隔不同的正则表达式选项"),
+            ("/", "有序选择运算符", "按优先级选择正则表达式"),
+            ("*", "零次或多次", "匹配前一个元素零次或多次"),
+            ("+", "一次或多次", "匹配前一个元素一次或多次"),
+            ("?", "零次或一次", "匹配前一个元素零次或一次"),
+            ("[]", "可选元素", "将元素标记为可选"),
+            ("()", "分组", "将元素分组"),
+            ("^", "省略标记", "标记节点为可省略"),
+            ("~", "提交标记", "标记错误恢复点"),
+            ("&", "返回标记", "标记返回点"),
+        ];
+
+        for (symbol, label, description) in regex_suggestions {
+            self.suggestions.push(CompletionItem {
+                label: symbol.to_string(),
+                kind: Some(CompletionItemKind::OPERATOR),
+                detail: Some(label.to_string()),
+                documentation: Some(Documentation::String(description.to_string())),
+                ..Default::default()
+            });
+        }
+    }
+}
+
+/// 获取格式化相关的代码补全
+pub fn get_formatting_completions() -> FormattingSuggestions {
+    let mut suggestions = FormattingSuggestions::new();
+    suggestions.add_formatting_config_suggestions();
+    suggestions.add_regex_formatting_suggestions();
+    suggestions
+}
+
+/// 在特定上下文中获取格式化建议
+pub fn get_contextual_formatting_completions(context: &str) -> FormattingSuggestions {
+    let mut suggestions = FormattingSuggestions::new();
+
+    match context {
+        "config" => {
+            suggestions.add_formatting_config_suggestions();
+        }
+        "regex" => {
+            suggestions.add_regex_formatting_suggestions();
+        }
+        "token" => {
+            // 添加token相关的格式化建议
+            suggestions.add_regex_formatting_suggestions();
+        }
+        _ => {
+            // 默认情况下提供所有建议
+            suggestions.add_formatting_config_suggestions();
+            suggestions.add_regex_formatting_suggestions();
+        }
+    }
+
+    suggestions
+}
+
 /// Suggests a token name for a given token symbol.
 fn symbol_name_suggestion(symbol: &str) -> String {
     let mut name = String::new();

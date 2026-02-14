@@ -64,18 +64,39 @@ impl RequestHandler for Formatting {
         let mut diags = vec![];
         let cst = lelwel::frontend::parser::Parser::new(&document, &mut diags).parse(&mut diags);
 
-        // 检查是否启用注释保留功能（通过LSP配置）
-        let preserve_comments = cache.get_config().map_or(false, |config| {
-            config.format_preserve_comments.unwrap_or(false)
-        });
+        // 获取文件AST
+        let file = match lelwel::frontend::ast::File::cast(&cst, lelwel::NodeRef::ROOT) {
+            Some(file) => file,
+            None => return Some(vec![]), // 无法解析，返回空编辑
+        };
+
+        // 获取配置并创建格式化器
+        let config = cache
+            .get_config()
+            .unwrap_or(&lelwel::ide::LspConfig::default());
+
+        let mut formatter = lelwel::frontend::format::LlwFormatter::new();
+
+        // 应用配置选项
+        if let Some(width) = config.format_max_line_width {
+            formatter = formatter.with_max_line_width(width);
+        }
+
+        if let Some(size) = config.format_indent_size {
+            formatter = formatter.with_indent_size(size);
+        }
+
+        if let Some(wrapping) = config.format_enable_wrapping {
+            formatter = formatter.with_wrapping(wrapping);
+        }
 
         // 格式化文档（根据配置选择是否保留注释）
-        let formatted_text = if preserve_comments {
+        let formatted_text = if config.format_preserve_comments.unwrap_or(false) {
             // 使用注释保留格式化
-            lelwel::frontend::format::format_llw_with_comments(&document, &cst).unwrap_or_default()
+            formatter.format_file_with_comments(&document, &cst, &file)
         } else {
             // 使用基本格式化
-            lelwel::frontend::format::format_llw(&cst).unwrap_or_default()
+            formatter.format_file(&cst, &file)
         };
 
         // 如果格式化后的文本与原始文本相同，返回空编辑

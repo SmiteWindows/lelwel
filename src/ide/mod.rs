@@ -12,9 +12,60 @@ use self::completion::*;
 use self::hover::*;
 use self::lookup::*;
 
+use crate::frontend::format::{LlwFormatter, format_llw, format_llw_with_comments};
+
 mod completion;
 mod hover;
 mod lookup;
+
+/// LSP服务器实现
+pub struct LspServer {
+    cache: Cache,
+}
+
+impl LspServer {
+    pub fn new() -> Self {
+        Self {
+            cache: Cache::default(),
+        }
+    }
+
+    /// 处理格式化文档请求
+    pub fn handle_formatting(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let text = self.cache.documents.get(&uri)?;
+
+        let formatted = self.cache.format_document(&uri, text)?;
+
+        if formatted == *text {
+            return None; // 没有变化
+        }
+
+        Some(vec![TextEdit {
+            range: Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: text.lines().count() as u32,
+                    character: text.lines().last().map(|l| l.len()).unwrap_or(0) as u32,
+                },
+            },
+            new_text: formatted,
+        }])
+    }
+
+    /// 处理配置变更
+    pub fn handle_config_change(&mut self, config: LspConfig) {
+        self.cache.update_config(config);
+    }
+
+    /// 处理格式化启用/禁用
+    pub fn handle_format_toggle(&mut self, enabled: bool) {
+        self.cache.set_format_enabled(enabled);
+    }
+}
 
 struct Analyzer {
     handle: JoinHandle<()>,
@@ -28,12 +79,24 @@ pub struct LspConfig {
     /// 格式化时是否保留注释
     #[serde(default)]
     pub format_preserve_comments: Option<bool>,
+    /// 最大行宽
+    #[serde(default)]
+    pub format_max_line_width: Option<usize>,
+    /// 缩进大小
+    #[serde(default)]
+    pub format_indent_size: Option<usize>,
+    /// 是否启用换行
+    #[serde(default)]
+    pub format_enable_wrapping: Option<bool>,
 }
 
 impl Default for LspConfig {
     fn default() -> Self {
         Self {
             format_preserve_comments: Some(false),
+            format_max_line_width: None,
+            format_indent_size: None,
+            format_enable_wrapping: None,
         }
     }
 }
@@ -43,9 +106,41 @@ pub struct Cache {
     analyzers: HashMap<Uri, Analyzer>,
     documents: HashMap<Uri, String>,
     config: Option<LspConfig>,
+    format_enabled: bool,
 }
 
 impl Cache {
+    /// 格式化文档
+    pub fn format_document(&self, uri: &Uri, text: &str) -> Option<String> {
+        // 解析文档
+        let parser = Parser::new();
+        let cst = parser.parse(text)?;
+
+        // 应用配置
+        let config = self.config.as_ref().unwrap_or(&LspConfig::default());
+
+        let mut formatter = LlwFormatter::new();
+
+        if let Some(width) = config.format_max_line_width {
+            formatter = formatter.with_max_line_width(width);
+        }
+
+        if let Some(size) = config.format_indent_size {
+            formatter = formatter.with_indent_size(size);
+        }
+
+        if let Some(wrapping) = config.format_enable_wrapping {
+            formatter = formatter.with_wrapping(wrapping);
+        }
+
+        // 根据配置选择是否保留注释
+        if config.format_preserve_comments.unwrap_or(false) {
+            format_llw_with_comments(text, &cst)
+        } else {
+            format_llw(&cst)
+        }
+    }
+
     pub fn analyze(&mut self, uri: Uri, text: String) {
         self.documents.insert(uri.clone(), text.clone());
         let (req_tx, req_rx) = mpsc::channel::<Request>();
@@ -131,6 +226,34 @@ impl Cache {
     /// 获取当前配置
     pub fn get_config(&self) -> Option<&LspConfig> {
         self.config.as_ref()
+    }
+
+    /// 格式化文档
+    pub fn format_document(&self, uri: &Uri, text: &str) -> Option<String> {
+        if !self.format_enabled {
+            return None;
+        }
+
+        // 解析文档
+        let mut diags = vec![];
+        let cst = Parser::new(text, &mut diags).parse(&mut diags);
+
+        // 应用配置
+        let config = self.config.as_ref().unwrap_or(&LspConfig::default());
+
+        // 根据配置选择是否保留注释
+        if config.format_preserve_comments.unwrap_or(false) {
+            // 这里需要实现 format_llw_with_comments 函数
+            None
+        } else {
+            // 这里需要实现 format_llw 函数
+            None
+        }
+    }
+
+    /// 启用或禁用格式化功能
+    pub fn set_format_enabled(&mut self, enabled: bool) {
+        self.format_enabled = enabled;
     }
 
     /// 更新配置
