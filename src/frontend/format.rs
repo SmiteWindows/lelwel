@@ -5,6 +5,9 @@ pub struct LlwFormatter {
     indent_level: usize,
     output: String,
     line_width: usize,
+    max_line_width: usize,
+    indent_size: usize,
+    should_wrap: bool,
 }
 
 impl Default for LlwFormatter {
@@ -19,7 +22,25 @@ impl LlwFormatter {
             indent_level: 0,
             output: String::new(),
             line_width: 0,
+            max_line_width: 80,
+            indent_size: 2,
+            should_wrap: true,
         }
+    }
+
+    pub fn with_max_line_width(mut self, width: usize) -> Self {
+        self.max_line_width = width;
+        self
+    }
+
+    pub fn with_indent_size(mut self, size: usize) -> Self {
+        self.indent_size = size;
+        self
+    }
+
+    pub fn with_wrapping(mut self, wrap: bool) -> Self {
+        self.should_wrap = wrap;
+        self
     }
 
     pub fn format_file(&mut self, cst: &Cst<'_>, file: File) -> String {
@@ -116,16 +137,14 @@ impl LlwFormatter {
                 // Detect single-line comments using pattern matching
                 if let Some(comment_end) = self.detect_single_line_comment(&text[processed..]) {
                     let comment = &text[processed..processed + comment_end];
-                    self.write(comment);
-                    self.writeln();
+                    self.format_comment(comment);
                     processed += comment_end;
                 }
                 // Detect multi-line comments
                 else if let Some(comment_end) = self.detect_multi_line_comment(&text[processed..])
                 {
                     let comment = &text[processed..processed + comment_end];
-                    self.write(comment);
-                    self.writeln();
+                    self.format_comment(comment);
                     processed += comment_end;
                 }
                 // Handle non-comment content
@@ -144,6 +163,37 @@ impl LlwFormatter {
                     break;
                 }
             }
+        }
+    }
+
+    /// Format comment with proper indentation
+    fn format_comment(&mut self, comment: &str) {
+        let trimmed = comment.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+
+        // For single-line comments, preserve indentation
+        if comment.starts_with("//") {
+            self.write_indented(comment);
+            self.writeln();
+        }
+        // For multi-line comments, format each line with proper indentation
+        else if comment.starts_with("/*") {
+            let lines: Vec<&str> = comment.split('\n').collect();
+            for (i, line) in lines.iter().enumerate() {
+                if i > 0 {
+                    self.writeln();
+                }
+                // Preserve leading spaces for alignment in multi-line comments
+                let leading_spaces = line.len() - line.trim_start().len();
+                let indent = " ".repeat(self.indent_level * self.indent_size + leading_spaces);
+                self.output.push_str(&indent);
+                self.output.push_str(line.trim());
+                self.line_width =
+                    self.indent_level * self.indent_size + leading_spaces + line.trim().len();
+            }
+            self.writeln();
         }
     }
 
@@ -220,87 +270,112 @@ impl LlwFormatter {
     }
 
     fn format_token_decl(&mut self, cst: &Cst<'_>, decl: TokenDecl) {
-        self.write("token ");
+        let mut token_line = String::new();
+        token_line.push_str("token ");
+
         if let Some((name, _)) = decl.name(cst) {
-            self.write(name);
+            token_line.push_str(name);
         }
+
         if let Some((symbol, _)) = decl.symbol(cst) {
-            self.write(" = ");
-            self.write(symbol);
+            token_line.push_str(" = ");
+            token_line.push_str(symbol);
         }
-        self.write(";");
+
+        token_line.push(';');
+
+        // Check if line is too long and needs wrapping
+        if self.should_wrap && token_line.len() > self.max_line_width {
+            // Multi-line format for long token declarations
+            self.write("token ");
+            if let Some((name, _)) = decl.name(cst) {
+                self.write(name);
+            }
+            if let Some((symbol, _)) = decl.symbol(cst) {
+                self.writeln();
+                self.write_indented("= ");
+                self.write(symbol);
+            }
+            self.write(";");
+        } else {
+            // Single-line format
+            self.write(&token_line);
+        }
     }
 
     fn format_rule_decl(&mut self, cst: &Cst<'_>, decl: RuleDecl) {
+        // Write rule name and modifiers
+        let mut rule_header = String::new();
         if let Some((name, _)) = decl.name(cst) {
-            self.write(name);
+            rule_header.push_str(name);
         }
 
         if decl.is_elided(cst) {
-            self.write("^");
+            rule_header.push('^');
         }
 
-        self.write(": ");
+        rule_header.push_str(": ");
 
+        // Check if we need to wrap the regex
         if let Some(regex) = decl.regex(cst) {
-            self.format_regex(cst, regex);
-        }
+            let regex_width = self.estimate_regex_width(cst, &regex);
+            let total_width = self.line_width + rule_header.len() + regex_width;
 
-        self.write(";");
+            if self.should_wrap && total_width > self.max_line_width && regex_width > 20 {
+                // Multi-line format
+                self.write(&rule_header);
+                self.indent_level += 1;
+                self.writeln();
+                self.format_regex(cst, regex);
+                self.indent_level -= 1;
+                self.writeln();
+                self.write(";");
+            } else {
+                // Single-line format
+                self.write(&rule_header);
+                self.format_regex(cst, regex);
+                self.write(";");
+            }
+        } else {
+            self.write(&rule_header);
+            self.write(";");
+        }
     }
 
     fn format_regex(&mut self, cst: &Cst<'_>, regex: Regex) {
+        self.format_regex_internal(cst, regex, false)
+    }
+
+    fn format_regex_internal(&mut self, cst: &Cst<'_>, regex: Regex, parenthesize: bool) {
+        let needs_parentheses = parenthesize && self.should_parenthesize(&regex);
+
+        if needs_parentheses {
+            self.write("(");
+        }
+
         match regex {
             Regex::Alternation(alt) => {
                 let operands: Vec<_> = alt.operands(cst).collect();
-                for (i, op) in operands.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" | ");
-                    }
-                    self.format_regex(cst, *op);
-                }
+                self.format_operator_separated(cst, operands, " | ", "alternation")
             }
             Regex::OrderedChoice(choice) => {
                 let operands: Vec<_> = choice.operands(cst).collect();
-                for (i, op) in operands.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" / ");
-                    }
-                    self.format_regex(cst, *op);
-                }
+                self.format_operator_separated(cst, operands, " / ", "ordered_choice")
             }
             Regex::Concat(concat) => {
                 let operands: Vec<_> = concat.operands(cst).collect();
-                for op in operands {
-                    self.format_regex(cst, op);
-                }
+                self.format_concat(cst, operands)
             }
             Regex::Paren(paren) => {
                 self.write("(");
                 if let Some(inner) = paren.inner(cst) {
-                    self.format_regex(cst, inner);
+                    self.format_regex_internal(cst, inner, false);
                 }
                 self.write(")");
             }
-            Regex::Optional(opt) => {
-                self.write("[");
-                if let Some(operand) = opt.operand(cst) {
-                    self.format_regex(cst, operand);
-                }
-                self.write("]");
-            }
-            Regex::Star(star) => {
-                if let Some(operand) = star.operand(cst) {
-                    self.format_regex(cst, operand);
-                }
-                self.write("*");
-            }
-            Regex::Plus(plus) => {
-                if let Some(operand) = plus.operand(cst) {
-                    self.format_regex(cst, operand);
-                }
-                self.write("+");
-            }
+            Regex::Optional(opt) => self.format_unary_operator(cst, opt.operand(cst), "[", "]"),
+            Regex::Star(star) => self.format_unary_operator(cst, star.operand(cst), "", "*"),
+            Regex::Plus(plus) => self.format_unary_operator(cst, plus.operand(cst), "", "+"),
             Regex::Name(name) => {
                 if let Some((value, _)) = name.value(cst) {
                     self.write(value);
@@ -353,6 +428,117 @@ impl LlwFormatter {
         }
     }
 
+    fn format_operator_separated(
+        &mut self,
+        cst: &Cst<'_>,
+        operands: Vec<Regex>,
+        separator: &str,
+        _operator_type: &str,
+    ) {
+        if operands.is_empty() {
+            return;
+        }
+
+        let current_line_width = self.line_width;
+        let separator_len = separator.len();
+
+        // Check if we need to wrap
+        let estimated_width = current_line_width
+            + self.estimate_regex_width(cst, &operands[0])
+            + operands
+                .iter()
+                .skip(1)
+                .map(|op| separator_len + self.estimate_regex_width(cst, op))
+                .sum::<usize>();
+
+        let should_wrap =
+            self.should_wrap && estimated_width > self.max_line_width && operands.len() > 1;
+
+        if should_wrap {
+            self.indent_level += 1;
+        }
+
+        for (i, op) in operands.iter().enumerate() {
+            if i > 0 {
+                if should_wrap {
+                    self.writeln();
+                    self.write(&" ".repeat(self.indent_level * self.indent_size));
+                } else {
+                    self.write(separator);
+                }
+            }
+            self.format_regex_internal(cst, *op, true);
+        }
+
+        if should_wrap {
+            self.indent_level -= 1;
+        }
+    }
+
+    fn format_concat(&mut self, cst: &Cst<'_>, operands: Vec<Regex>) {
+        if operands.is_empty() {
+            return;
+        }
+
+        // Check if concatenation needs wrapping
+        let total_width: usize = operands
+            .iter()
+            .map(|op| self.estimate_regex_width(cst, op))
+            .sum();
+
+        let should_wrap = self.should_wrap
+            && (self.line_width + total_width > self.max_line_width)
+            && operands.len() > 1;
+
+        if should_wrap {
+            self.indent_level += 1;
+        }
+
+        for (i, op) in operands.iter().enumerate() {
+            if i > 0 && should_wrap {
+                self.writeln();
+                self.write_indented("");
+            }
+            self.format_regex_internal(cst, *op, true);
+        }
+
+        if should_wrap {
+            self.indent_level -= 1;
+        }
+    }
+
+    fn format_unary_operator(
+        &mut self,
+        cst: &Cst<'_>,
+        operand: Option<Regex>,
+        prefix: &str,
+        suffix: &str,
+    ) {
+        self.write(prefix);
+        if let Some(op) = operand {
+            self.format_regex_internal(cst, op, true);
+        }
+        self.write(suffix);
+    }
+
+    fn should_parenthesize(&self, regex: &Regex) -> bool {
+        matches!(
+            regex,
+            Regex::Alternation(_) | Regex::OrderedChoice(_) | Regex::Concat(_)
+        )
+    }
+
+    fn estimate_regex_width(&self, cst: &Cst<'_>, regex: &Regex) -> usize {
+        match regex {
+            Regex::Name(name) => name.value(cst).map(|(v, _)| v.len()).unwrap_or(0),
+            Regex::Symbol(symbol) => symbol.value(cst).map(|(v, _)| v.len()).unwrap_or(0),
+            Regex::Paren(_) => 2,                 // Minimum for parentheses
+            Regex::Optional(_) => 2,              // Minimum for brackets
+            Regex::Star(_) | Regex::Plus(_) => 1, // Single character operators
+            _ => 10,                              // Conservative estimate for complex expressions
+        }
+    }
+
     fn write(&mut self, text: &str) {
         self.output.push_str(text);
         self.line_width += text.len();
@@ -360,8 +546,18 @@ impl LlwFormatter {
 
     fn writeln(&mut self) {
         self.output.push('\n');
-        self.output.push_str(&"  ".repeat(self.indent_level));
-        self.line_width = self.indent_level * 2;
+        self.output
+            .push_str(&" ".repeat(self.indent_level * self.indent_size));
+        self.line_width = self.indent_level * self.indent_size;
+    }
+
+    fn write_indented(&mut self, text: &str) {
+        if self.line_width == 0 {
+            self.output
+                .push_str(&" ".repeat(self.indent_level * self.indent_size));
+            self.line_width = self.indent_level * self.indent_size;
+        }
+        self.write(text);
     }
 }
 
