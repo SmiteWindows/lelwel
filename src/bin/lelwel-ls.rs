@@ -2,7 +2,11 @@
 
 use std::error::Error;
 
+use lelwel::frontend::ast::{AstNode, File};
+use lelwel::frontend::parser::{NodeRef, Parser};
+use lelwel::frontend::sema::SemanticPass;
 use lelwel::ide::Cache;
+use lelwel::ide::completion;
 use ls_types::{
     CompletionOptions, GotoDefinitionResponse, Hover, HoverContents, HoverProviderCapability,
     InitializeParams, MarkupContent, MarkupKind, OneOf, PublishDiagnosticsParams,
@@ -56,24 +60,21 @@ impl RequestHandler for Formatting {
         let TextDocumentIdentifier { uri } = params.text_document;
 
         // 获取文档内容
-        let Some(document) = cache.get_document(&uri) else {
-            return None;
-        };
+        let document = cache.get_document(&uri)?;
 
         // 解析文档
         let mut diags = vec![];
-        let cst = lelwel::frontend::parser::Parser::new(&document, &mut diags).parse(&mut diags);
+        let cst = lelwel::frontend::parser::Parser::new(document, &mut diags).parse(&mut diags);
 
         // 获取文件AST
-        let file = match lelwel::frontend::ast::File::cast(&cst, lelwel::NodeRef::ROOT) {
+        let file = match File::cast(&cst, NodeRef::ROOT) {
             Some(file) => file,
             None => return Some(vec![]), // 无法解析，返回空编辑
         };
 
-        // 获取配置并创建格式化器
-        let config = cache
-            .get_config()
-            .unwrap_or(&lelwel::ide::LspConfig::default());
+        // 应用配置（修复生命周期问题）
+        let default_config = lelwel::ide::LspConfig::default();
+        let config = cache.get_config().unwrap_or(&default_config);
 
         let mut formatter = lelwel::frontend::format::LlwFormatter::new();
 
@@ -109,10 +110,10 @@ impl RequestHandler for Formatting {
         // 格式化文档（根据配置选择是否保留注释）
         let formatted_text = if config.format_preserve_comments.unwrap_or(false) {
             // 使用注释保留格式化
-            formatter.format_file_with_comments(&document, &cst, &file)
+            formatter.format_file_with_comments(document, &cst, file)
         } else {
             // 使用基本格式化
-            formatter.format_file(&cst, &file)
+            formatter.format_file(&cst, file)
         };
 
         // 如果格式化后的文本与原始文本相同，返回空编辑
@@ -146,10 +147,10 @@ trait NotificationHandler: ls_types::notification::Notification {
 impl NotificationHandler for ls_types::notification::DidChangeConfiguration {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification> {
         // 处理配置变更
-        if let Some(settings) = params.settings.get("lelwel") {
-            if let Ok(config) = serde_json::from_value::<lelwel::ide::LspConfig>(settings.clone()) {
-                cache.update_config(config);
-            }
+        if let Some(settings) = params.settings.get("lelwel")
+            && let Ok(config) = serde_json::from_value::<lelwel::ide::LspConfig>(settings.clone())
+        {
+            cache.update_config(config);
         }
         None
     }
@@ -264,7 +265,27 @@ impl RequestHandler for References {
 
 impl RequestHandler for Completion {
     fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result {
-        cache.completion(params)
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+
+        // 使用公共API获取文档内容
+        let document = cache.get_document(&uri)?;
+
+        // 创建SimpleFile用于位置转换
+        use codespan_reporting::files::SimpleFile;
+        let file = SimpleFile::new(uri.as_str(), document.as_str());
+
+        // 使用现有的位置转换函数
+        let offset = lelwel::ide::compat::position_to_offset(&file, &pos);
+
+        let mut diags = vec![];
+        let cst = Parser::new(document, &mut diags).parse(&mut diags);
+
+        // 使用正确的语义分析API
+        let sema = SemanticPass::run(&cst, &mut diags);
+
+        // 使用增强的补全函数，包含格式化建议
+        Some(completion::enhanced_completion(&cst, offset, &sema))
     }
 }
 

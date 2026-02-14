@@ -12,15 +12,23 @@ use self::completion::*;
 use self::hover::*;
 use self::lookup::*;
 
+use crate::NodeRef;
+use crate::frontend::ast::{AstNode, File};
 use crate::frontend::format::{LlwFormatter, format_llw, format_llw_with_comments};
 
-mod completion;
+pub mod completion;
 mod hover;
 mod lookup;
 
 /// LSP服务器实现
 pub struct LspServer {
     cache: Cache,
+}
+
+impl Default for LspServer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LspServer {
@@ -118,28 +126,19 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// 格式化文档
-    pub fn format_document(&self, uri: &Uri, text: &str) -> Option<String> {
+    /// 格式化文档（使用公共API）
+    pub fn format_document(&self, _uri: &Uri, text: &str) -> Option<String> {
+        if !self.format_enabled {
+            return None;
+        }
+
         // 解析文档
-        let parser = Parser::new();
-        let cst = parser.parse(text)?;
+        let mut diags = vec![];
+        let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
-        // 应用配置
-        let config = self.config.as_ref().unwrap_or(&LspConfig::default());
-
-        let mut formatter = LlwFormatter::new();
-
-        if let Some(width) = config.format_max_line_width {
-            formatter = formatter.with_max_line_width(width);
-        }
-
-        if let Some(size) = config.format_indent_size {
-            formatter = formatter.with_indent_size(size);
-        }
-
-        if let Some(wrapping) = config.format_enable_wrapping {
-            formatter = formatter.with_wrapping(wrapping);
-        }
+        // 应用配置（修复生命周期问题）
+        let default_config = LspConfig::default();
+        let config = self.config.as_ref().unwrap_or(&default_config);
 
         // 根据配置选择是否保留注释
         if config.format_preserve_comments.unwrap_or(false) {
@@ -237,7 +236,8 @@ impl Cache {
     }
 
     /// 格式化文档
-    pub fn format_document(&self, uri: &Uri, text: &str) -> Option<String> {
+    /// 格式化文档（使用直接格式化器）
+    pub fn format_document_direct(&self, _uri: &Uri, text: &str) -> Option<String> {
         if !self.format_enabled {
             return None;
         }
@@ -247,13 +247,11 @@ impl Cache {
         let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
         // 获取文件AST
-        let file = match File::cast(&cst, NodeRef::ROOT) {
-            Some(file) => file,
-            None => return None, // 无法解析，返回None
-        };
+        let file = File::cast(&cst, NodeRef::ROOT)?;
 
-        // 应用配置
-        let config = self.config.as_ref().unwrap_or(&LspConfig::default());
+        // 应用配置（修复生命周期问题）
+        let default_config = LspConfig::default();
+        let config = self.config.as_ref().unwrap_or(&default_config);
 
         // 创建格式化器并应用配置
         let mut formatter = LlwFormatter::new();
@@ -451,7 +449,7 @@ fn related_as_hints(diags: &[Diagnostic]) -> Vec<Diagnostic> {
 }
 
 /// required functions due to different versions of lsp-types in codespan
-mod compat {
+pub mod compat {
     use crate::Span;
     use codespan_reporting::files::SimpleFile;
 
