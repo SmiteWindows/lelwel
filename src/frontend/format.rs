@@ -66,126 +66,100 @@ impl LlwFormatter {
             .chain(file.part_decls(cst).map(|d| (d.span(cst), Decl::Part(d))))
             .collect();
 
-        // Sort declarations by their position in the source
         declarations.sort_by_key(|(span, _)| span.start);
 
-        let mut last_position = 0;
+        // Process declarations with modern iterator patterns
+        let last_position =
+            declarations
+                .iter()
+                .enumerate()
+                .fold(0, |last_position, (i, (span, decl))| {
+                    // Extract and preserve content between declarations
+                    if span.start > last_position {
+                        let gap = &source[last_position..span.start];
+                        self.extract_and_format_comments(gap);
+                    }
 
-        for (i, (span, decl)) in declarations.iter().enumerate() {
-            // Extract and preserve content between last declaration and current one
-            if span.start > last_position {
-                let gap = &source[last_position..span.start];
-                self.preserve_comments_and_whitespace(gap);
-            }
+                    // Format the current declaration
+                    self.format_decl(cst, decl);
 
-            // Format the current declaration
-            self.format_decl(cst, decl);
+                    // Add spacing between declarations
+                    if i < declarations.len() - 1 {
+                        self.writeln();
+                        self.writeln();
+                    }
 
-            // Add spacing between declarations (but not after the last one)
-            if i < declarations.len() - 1 {
-                self.writeln();
-                self.writeln();
-            }
+                    span.end
+                });
 
-            last_position = span.end;
-        }
-
-        // Preserve any content after the last declaration
-        source
-            .get(last_position..)
-            .map(|remaining| self.preserve_comments_and_whitespace(remaining));
+        // Preserve any content after the last declaration using modern syntax
+        if let Some(remaining) = source
+            .get(last_position..) { self.extract_and_format_comments(remaining) }
 
         self.output.clone()
     }
 
-    /// Preserve comments and whitespace from the original source
-    fn preserve_comments_and_whitespace(&mut self, text: &str) {
+    /// Extract and format comments with intelligent whitespace handling
+    fn extract_and_format_comments(&mut self, text: &str) {
         if text.trim().is_empty() {
-            // If it's just whitespace, preserve the newlines using iterator
+            // Preserve newlines for pure whitespace
             text.chars()
                 .filter(|&c| c == '\n')
                 .for_each(|_| self.writeln());
         } else {
-            // Preserve the text as-is (including comments)
-            self.write(text);
-        }
-    }
+            // Process text with comments using modern iterator patterns
+            let mut processed = 0;
+            let bytes = text.as_bytes();
 
-    fn format_comments_before(&mut self, cst: &Cst<'_>, node: NodeRef, last_position: usize) {
-        let node_span = cst.span(node);
-
-        // Look for comments between last_position and current node start
-        if node_span.start > last_position {
-            let source = cst.source();
-            let gap = &source[last_position..node_span.start];
-
-            // Use iterator-based approach to process the gap
-            let mut processed_chars = 0;
-            let gap_bytes = gap.as_bytes();
-
-            while processed_chars < gap_bytes.len() {
-                // Check for single-line comments
-                if processed_chars + 1 < gap_bytes.len()
-                    && gap_bytes[processed_chars] == b'/'
-                    && gap_bytes[processed_chars + 1] == b'/'
-                {
-                    // Find the end of single-line comment (end of line)
-                    let comment_end = gap[processed_chars..]
-                        .char_indices()
-                        .find(|(_, c)| *c == '\n')
-                        .map(|(i, _)| processed_chars + i)
-                        .unwrap_or(gap.len());
-
-                    // Write the comment
-                    let comment = &gap[processed_chars..comment_end];
+            while processed < bytes.len() {
+                // Detect single-line comments using pattern matching
+                if let Some(comment_end) = self.detect_single_line_comment(&text[processed..]) {
+                    let comment = &text[processed..processed + comment_end];
                     self.write(comment);
                     self.writeln();
-
-                    processed_chars = comment_end;
+                    processed += comment_end;
                 }
-                // Check for multi-line comments
-                else if processed_chars + 1 < gap_bytes.len()
-                    && gap_bytes[processed_chars] == b'/'
-                    && gap_bytes[processed_chars + 1] == b'*'
+                // Detect multi-line comments
+                else if let Some(comment_end) = self.detect_multi_line_comment(&text[processed..])
                 {
-                    // Find the end of multi-line comment (*/)
-                    let comment_end = gap[processed_chars..]
-                        .char_indices()
-                        .find(|(i, c)| {
-                            *c == '*'
-                                && i + 1 < gap[processed_chars..].len()
-                                && gap.as_bytes()[processed_chars + i + 1] == b'/'
-                        })
-                        .map(|(i, _)| processed_chars + i + 2)
-                        .unwrap_or(gap.len());
-
-                    // Write the comment
-                    let comment = &gap[processed_chars..comment_end];
+                    let comment = &text[processed..processed + comment_end];
                     self.write(comment);
                     self.writeln();
-
-                    processed_chars = comment_end;
-                } else {
-                    // Write non-comment content (whitespace, etc.)
-                    let next_comment_start = gap[processed_chars..]
-                        .char_indices()
-                        .find(|(_, c)| *c == '/')
-                        .map(|(i, _)| processed_chars + i)
-                        .unwrap_or(gap.len());
-
-                    if next_comment_start > processed_chars {
-                        let content = &gap[processed_chars..next_comment_start];
-                        if !content.trim().is_empty() {
-                            self.write(content);
-                        }
-                        processed_chars = next_comment_start;
-                    } else {
-                        // No more content to process
-                        break;
+                    processed += comment_end;
+                }
+                // Handle non-comment content
+                else if let Some(next_comment) = text[processed..].find('/') {
+                    let content = &text[processed..processed + next_comment];
+                    if !content.trim().is_empty() {
+                        self.write(content);
                     }
+                    processed += next_comment;
+                } else {
+                    // Write remaining content
+                    let remaining = &text[processed..];
+                    if !remaining.trim().is_empty() {
+                        self.write(remaining);
+                    }
+                    break;
                 }
             }
         }
+    }
+
+    /// Detect single-line comments using modern string methods
+    fn detect_single_line_comment(&self, text: &str) -> Option<usize> {
+        text.starts_with("//").then(|| {
+            text.char_indices()
+                .find(|(_, c)| *c == '\n')
+                .map(|(i, _)| i)
+                .unwrap_or(text.len())
+        })
+    }
+
+    /// Detect multi-line comments using modern string methods
+    fn detect_multi_line_comment(&self, text: &str) -> Option<usize> {
+        text.starts_with("/*")
+            .then(|| text.find("*/").map(|i| i + 2).unwrap_or(text.len()))
     }
 
     fn format_decl(&mut self, cst: &Cst<'_>, decl: &Decl) {

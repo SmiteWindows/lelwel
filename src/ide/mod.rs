@@ -22,10 +22,27 @@ struct Analyzer {
     noti_rx: mpsc::Receiver<Notification>,
 }
 
+/// LSP服务器配置
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct LspConfig {
+    /// 格式化时是否保留注释
+    #[serde(default)]
+    pub format_preserve_comments: Option<bool>,
+}
+
+impl Default for LspConfig {
+    fn default() -> Self {
+        Self {
+            format_preserve_comments: Some(false),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Cache {
     analyzers: HashMap<Uri, Analyzer>,
     documents: HashMap<Uri, String>,
+    config: Option<LspConfig>,
 }
 
 impl Cache {
@@ -109,6 +126,16 @@ impl Cache {
     }
     pub fn get_document(&self, uri: &Uri) -> Option<&String> {
         self.documents.get(uri)
+    }
+
+    /// 获取当前配置
+    pub fn get_config(&self) -> Option<&LspConfig> {
+        self.config.as_ref()
+    }
+
+    /// 更新配置
+    pub fn update_config(&mut self, config: LspConfig) {
+        self.config = Some(config);
     }
 }
 

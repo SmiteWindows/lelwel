@@ -64,9 +64,18 @@ impl RequestHandler for Formatting {
         let mut diags = vec![];
         let cst = lelwel::frontend::parser::Parser::new(&document, &mut diags).parse(&mut diags);
 
-        // 格式化文档
-        let Some(formatted_text) = lelwel::frontend::format::format_llw(&cst) else {
-            return None;
+        // 检查是否启用注释保留功能（通过LSP配置）
+        let preserve_comments = cache.get_config().map_or(false, |config| {
+            config.format_preserve_comments.unwrap_or(false)
+        });
+
+        // 格式化文档（根据配置选择是否保留注释）
+        let formatted_text = if preserve_comments {
+            // 使用注释保留格式化
+            lelwel::frontend::format::format_llw_with_comments(&document, &cst).unwrap_or_default()
+        } else {
+            // 使用基本格式化
+            lelwel::frontend::format::format_llw(&cst).unwrap_or_default()
         };
 
         // 如果格式化后的文本与原始文本相同，返回空编辑
