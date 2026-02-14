@@ -85,18 +85,26 @@ pub struct LspConfig {
     /// 缩进大小
     #[serde(default)]
     pub format_indent_size: Option<usize>,
-    /// 是否启用换行
+    /// 是否启用智能换行
     #[serde(default)]
     pub format_enable_wrapping: Option<bool>,
+    /// 紧凑串联格式
+    #[serde(default)]
+    pub format_compact_concat: Option<bool>,
+    /// 操作符对齐
+    #[serde(default)]
+    pub format_align_operators: Option<bool>,
 }
 
 impl Default for LspConfig {
     fn default() -> Self {
         Self {
             format_preserve_comments: Some(false),
-            format_max_line_width: None,
-            format_indent_size: None,
-            format_enable_wrapping: None,
+            format_max_line_width: Some(80),
+            format_indent_size: Some(2),
+            format_enable_wrapping: Some(true),
+            format_compact_concat: Some(false),
+            format_align_operators: Some(true),
         }
     }
 }
@@ -238,16 +246,43 @@ impl Cache {
         let mut diags = vec![];
         let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
+        // 获取文件AST
+        let file = match File::cast(&cst, NodeRef::ROOT) {
+            Some(file) => file,
+            None => return None, // 无法解析，返回None
+        };
+
         // 应用配置
         let config = self.config.as_ref().unwrap_or(&LspConfig::default());
 
+        // 创建格式化器并应用配置
+        let mut formatter = LlwFormatter::new();
+
+        if let Some(width) = config.format_max_line_width {
+            formatter = formatter.with_max_line_width(width);
+        }
+
+        if let Some(size) = config.format_indent_size {
+            formatter = formatter.with_indent_size(size);
+        }
+
+        if let Some(wrapping) = config.format_enable_wrapping {
+            formatter = formatter.with_wrapping(wrapping);
+        }
+
+        if let Some(compact) = config.format_compact_concat {
+            formatter = formatter.with_compact_concat(compact);
+        }
+
+        if let Some(align) = config.format_align_operators {
+            formatter = formatter.with_align_operators(align);
+        }
+
         // 根据配置选择是否保留注释
         if config.format_preserve_comments.unwrap_or(false) {
-            // 这里需要实现 format_llw_with_comments 函数
-            None
+            Some(formatter.format_file_with_comments(text, &cst, file))
         } else {
-            // 这里需要实现 format_llw 函数
-            None
+            Some(formatter.format_file(&cst, file))
         }
     }
 

@@ -90,6 +90,22 @@ impl RequestHandler for Formatting {
             formatter = formatter.with_wrapping(wrapping);
         }
 
+        if let Some(compact) = config.format_compact_concat {
+            formatter = formatter.with_compact_concat(compact);
+        }
+
+        if let Some(align) = config.format_align_operators {
+            formatter = formatter.with_align_operators(align);
+        }
+
+        if let Some(compact) = config.format_compact_concat {
+            formatter = formatter.with_compact_concat(compact);
+        }
+
+        if let Some(align) = config.format_align_operators {
+            formatter = formatter.with_align_operators(align);
+        }
+
         // 格式化文档（根据配置选择是否保留注释）
         let formatted_text = if config.format_preserve_comments.unwrap_or(false) {
             // 使用注释保留格式化

@@ -8,6 +8,8 @@ pub struct LlwFormatter {
     max_line_width: usize,
     indent_size: usize,
     should_wrap: bool,
+    compact_concat: bool,
+    align_operators: bool,
 }
 
 impl Default for LlwFormatter {
@@ -25,6 +27,8 @@ impl LlwFormatter {
             max_line_width: 80,
             indent_size: 2,
             should_wrap: true,
+            compact_concat: false,
+            align_operators: true,
         }
     }
 
@@ -40,6 +44,16 @@ impl LlwFormatter {
 
     pub fn with_wrapping(mut self, wrap: bool) -> Self {
         self.should_wrap = wrap;
+        self
+    }
+
+    pub fn with_compact_concat(mut self, compact: bool) -> Self {
+        self.compact_concat = compact;
+        self
+    }
+
+    pub fn with_align_operators(mut self, align: bool) -> Self {
+        self.align_operators = align;
         self
     }
 
@@ -454,6 +468,9 @@ impl LlwFormatter {
         let should_wrap =
             self.should_wrap && estimated_width > self.max_line_width && operands.len() > 1;
 
+        // 操作符对齐：如果启用且需要换行，对齐操作符
+        let operator_alignment = self.align_operators && should_wrap;
+
         if should_wrap {
             self.indent_level += 1;
         }
@@ -462,7 +479,13 @@ impl LlwFormatter {
             if i > 0 {
                 if should_wrap {
                     self.writeln();
-                    self.write(&" ".repeat(self.indent_level * self.indent_size));
+                    if operator_alignment {
+                        // 对齐操作符到相同缩进级别
+                        let alignment_spaces = self.indent_level * self.indent_size;
+                        self.write(&" ".repeat(alignment_spaces));
+                    } else {
+                        self.write(&" ".repeat(self.indent_level * self.indent_size));
+                    }
                 } else {
                     self.write(separator);
                 }
@@ -478,6 +501,22 @@ impl LlwFormatter {
     fn format_concat(&mut self, cst: &Cst<'_>, operands: Vec<Regex>) {
         if operands.is_empty() {
             return;
+        }
+
+        // 紧凑串联格式：如果启用且操作数较少，保持在一行
+        if self.compact_concat && operands.len() <= 3 {
+            let total_width: usize = operands
+                .iter()
+                .map(|op| self.estimate_regex_width(cst, op))
+                .sum();
+
+            // 如果总宽度不超过限制，保持紧凑格式
+            if self.line_width + total_width <= self.max_line_width {
+                for op in operands {
+                    self.format_regex_internal(cst, op, true);
+                }
+                return;
+            }
         }
 
         // Check if concatenation needs wrapping
