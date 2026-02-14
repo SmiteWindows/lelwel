@@ -20,7 +20,7 @@ pub mod completion;
 mod hover;
 mod lookup;
 
-/// LSP服务器实现
+/// LSP server implementation
 pub struct LspServer {
     cache: Cache,
 }
@@ -38,7 +38,7 @@ impl LspServer {
         }
     }
 
-    /// 处理格式化文档请求
+    /// Handle formatting document requests
     pub fn handle_formatting(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
         let text = self.cache.documents.get(&uri)?;
@@ -46,7 +46,7 @@ impl LspServer {
         let formatted = self.cache.format_document(&uri, text)?;
 
         if formatted == *text {
-            return None; // 没有变化
+            return None; // No changes
         }
 
         Some(vec![TextEdit {
@@ -64,12 +64,12 @@ impl LspServer {
         }])
     }
 
-    /// 处理配置变更
+    /// Handle configuration changes
     pub fn handle_config_change(&mut self, config: LspConfig) {
         self.cache.update_config(config);
     }
 
-    /// 处理格式化启用/禁用
+    /// Handle formatting enable/disable toggle
     pub fn handle_format_toggle(&mut self, enabled: bool) {
         self.cache.set_format_enabled(enabled);
     }
@@ -81,25 +81,25 @@ struct Analyzer {
     noti_rx: mpsc::Receiver<Notification>,
 }
 
-/// LSP服务器配置
+/// LSP server configuration
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct LspConfig {
-    /// 格式化时是否保留注释
+    /// Whether to preserve comments during formatting
     #[serde(default)]
     pub format_preserve_comments: Option<bool>,
-    /// 最大行宽
+    /// Maximum line width
     #[serde(default)]
     pub format_max_line_width: Option<usize>,
-    /// 缩进大小
+    /// Indentation size
     #[serde(default)]
     pub format_indent_size: Option<usize>,
-    /// 是否启用智能换行
+    /// Whether to enable smart line wrapping
     #[serde(default)]
     pub format_enable_wrapping: Option<bool>,
-    /// 紧凑串联格式
+    /// Compact concatenation format
     #[serde(default)]
     pub format_compact_concat: Option<bool>,
-    /// 操作符对齐
+    /// Operator alignment
     #[serde(default)]
     pub format_align_operators: Option<bool>,
 }
@@ -126,21 +126,21 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// 格式化文档（使用公共API）
+    /// Format document (using public API)
     pub fn format_document(&self, _uri: &Uri, text: &str) -> Option<String> {
         if !self.format_enabled {
             return None;
         }
 
-        // 解析文档
+        // Parse the document
         let mut diags = vec![];
         let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
-        // 应用配置（修复生命周期问题）
+        // Apply configuration (fix lifetime issues)
         let default_config = LspConfig::default();
         let config = self.config.as_ref().unwrap_or(&default_config);
 
-        // 根据配置选择是否保留注释
+        // Choose whether to preserve comments based on configuration
         if config.format_preserve_comments.unwrap_or(false) {
             format_llw_with_comments(text, &cst)
         } else {
@@ -230,30 +230,30 @@ impl Cache {
         self.documents.get(uri)
     }
 
-    /// 获取当前配置
+    /// Get current configuration
     pub fn get_config(&self) -> Option<&LspConfig> {
         self.config.as_ref()
     }
 
-    /// 格式化文档
-    /// 格式化文档（使用直接格式化器）
+    /// Format document
+    /// Format document (using direct formatter)
     pub fn format_document_direct(&self, _uri: &Uri, text: &str) -> Option<String> {
         if !self.format_enabled {
             return None;
         }
 
-        // 解析文档
+        // Parse the document
         let mut diags = vec![];
         let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
-        // 获取文件AST
+        // Get file AST
         let file = File::cast(&cst, NodeRef::ROOT)?;
 
-        // 应用配置（修复生命周期问题）
+        // Apply configuration (fix lifetime issues)
         let default_config = LspConfig::default();
         let config = self.config.as_ref().unwrap_or(&default_config);
 
-        // 创建格式化器并应用配置
+        // Create formatter and apply configuration
         let mut formatter = LlwFormatter::new();
 
         if let Some(width) = config.format_max_line_width {
@@ -276,7 +276,7 @@ impl Cache {
             formatter = formatter.with_align_operators(align);
         }
 
-        // 根据配置选择是否保留注释
+        // Choose whether to preserve comments based on configuration
         if config.format_preserve_comments.unwrap_or(false) {
             Some(formatter.format_file_with_comments(text, &cst, file))
         } else {
@@ -284,12 +284,12 @@ impl Cache {
         }
     }
 
-    /// 启用或禁用格式化功能
+    /// Enable or disable formatting functionality
     pub fn set_format_enabled(&mut self, enabled: bool) {
         self.format_enabled = enabled;
     }
 
-    /// 更新配置
+    /// Update configuration
     pub fn update_config(&mut self, config: LspConfig) {
         self.config = Some(config);
     }

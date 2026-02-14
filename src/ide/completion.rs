@@ -5,7 +5,7 @@ use crate::frontend::ast::{AstNode, File, Name, Named};
 use crate::frontend::lexer::Token;
 use crate::{Cst, Node, NodeRef, Rule, SemanticData};
 
-/// 格式化相关的代码补全建议
+/// Formatting-related code completion suggestions
 #[derive(Debug, Clone)]
 pub struct FormattingSuggestions {
     pub suggestions: Vec<CompletionItem>,
@@ -24,9 +24,9 @@ impl FormattingSuggestions {
         }
     }
 
-    /// 添加格式化配置建议
+    /// Add formatting configuration suggestions
     pub fn add_formatting_config_suggestions(&mut self) {
-        // 格式化配置选项
+        // Formatting configuration options
         let config_options = vec![
             ("format_preserve_comments", "是否保留注释", "true"),
             ("format_max_line_width", "最大行宽", "80"),
@@ -48,7 +48,7 @@ impl FormattingSuggestions {
         }
     }
 
-    /// 添加正则表达式格式化建议
+    /// Add regular expression formatting suggestions
     pub fn add_regex_formatting_suggestions(&mut self) {
         let regex_suggestions = vec![
             ("|", "交替运算符", "用于分隔不同的正则表达式选项"),
@@ -75,7 +75,7 @@ impl FormattingSuggestions {
     }
 }
 
-/// 获取格式化相关的代码补全
+/// Get formatting-related code completions
 pub fn get_formatting_completions() -> FormattingSuggestions {
     let mut suggestions = FormattingSuggestions::new();
     suggestions.add_formatting_config_suggestions();
@@ -83,7 +83,7 @@ pub fn get_formatting_completions() -> FormattingSuggestions {
     suggestions
 }
 
-/// 在特定上下文中获取格式化建议
+/// Get formatting suggestions in specific contexts
 pub fn get_contextual_formatting_completions(context: &str) -> FormattingSuggestions {
     let mut suggestions = FormattingSuggestions::new();
 
@@ -95,11 +95,11 @@ pub fn get_contextual_formatting_completions(context: &str) -> FormattingSuggest
             suggestions.add_regex_formatting_suggestions();
         }
         "token" => {
-            // 添加token相关的格式化建议
+            // Add token-related formatting suggestions
             suggestions.add_regex_formatting_suggestions();
         }
         _ => {
-            // 默认情况下提供所有建议
+            // Provide all suggestions by default
             suggestions.add_formatting_config_suggestions();
             suggestions.add_regex_formatting_suggestions();
         }
@@ -422,7 +422,7 @@ pub fn completion(
                         .map(|(name, _)| name),
                 );
 
-                // 添加格式化建议
+                // Add formatting suggestions
                 let formatting_suggestions = get_contextual_formatting_completions("regex");
                 items.extend(formatting_suggestions.suggestions);
             }
@@ -469,7 +469,7 @@ pub fn completion(
             Node::Rule(Rule::File | Rule::Error, _) => {
                 add_top_level_items(cst, file, sema, &mut items);
 
-                // 在顶层添加格式化配置建议
+                // Add formatting configuration suggestions at top level
                 let formatting_suggestions = get_contextual_formatting_completions("config");
                 items.extend(formatting_suggestions.suggestions);
             }
@@ -481,29 +481,29 @@ pub fn completion(
         }
         add_top_level_items(cst, file, sema, &mut items);
 
-        // 在顶层添加格式化配置建议
+        // Add formatting configuration suggestions at top level
         let formatting_suggestions = get_contextual_formatting_completions("config");
         items.extend(formatting_suggestions.suggestions);
     }
     Some(CompletionResponse::Array(items))
 }
 
-/// 增强的补全函数，包含格式化建议
+/// Enhanced completion function with formatting suggestions
 pub fn enhanced_completion(
     cst: &Cst<'_>,
     pos: usize,
     sema: &SemanticData<'_>,
 ) -> CompletionResponse {
-    // 检测当前上下文
+    // Detect current context
     let context = detect_formatting_context(cst, pos);
 
-    // 获取包含格式化建议的补全列表
+    // Get completion list with formatting suggestions
     let items = completion_with_formatting(cst, sema, pos, &context);
 
     CompletionResponse::Array(items)
 }
 
-/// 检测格式化上下文
+/// Detect formatting context
 fn detect_formatting_context(cst: &Cst<'_>, pos: usize) -> String {
     if let Some(node) = lookup_rule_node(cst, NodeRef::ROOT, pos.saturating_sub(1)) {
         match cst.get(node) {
@@ -526,7 +526,7 @@ fn detect_formatting_context(cst: &Cst<'_>, pos: usize) -> String {
     }
 }
 
-/// 带格式化建议的补全函数
+/// Completion function with formatting suggestions
 fn completion_with_formatting(
     cst: &Cst<'_>,
     sema: &SemanticData<'_>,
@@ -535,14 +535,14 @@ fn completion_with_formatting(
 ) -> Vec<CompletionItem> {
     let mut items = vec![];
 
-    // 调用原有的补全逻辑
+    // Call original completion logic
     if let Some(completion_response) = completion(cst, pos, sema)
         && let CompletionResponse::Array(mut completion_items) = completion_response
     {
         items.append(&mut completion_items);
     }
 
-    // 添加格式化建议
+    // Add formatting suggestions
     let formatting_suggestions = get_contextual_formatting_completions(context);
     items.extend(formatting_suggestions.suggestions);
 

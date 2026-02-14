@@ -59,26 +59,26 @@ impl RequestHandler for Formatting {
 
         let TextDocumentIdentifier { uri } = params.text_document;
 
-        // 获取文档内容
+        // Get document content
         let document = cache.get_document(&uri)?;
 
-        // 解析文档
+        // Parse document
         let mut diags = vec![];
         let cst = lelwel::frontend::parser::Parser::new(document, &mut diags).parse(&mut diags);
 
-        // 获取文件AST
+        // Get file AST
         let file = match File::cast(&cst, NodeRef::ROOT) {
             Some(file) => file,
-            None => return Some(vec![]), // 无法解析，返回空编辑
+            None => return Some(vec![]), // Unable to parse, return empty edits
         };
 
-        // 应用配置（修复生命周期问题）
+        // Apply configuration (fix lifetime issues)
         let default_config = lelwel::ide::LspConfig::default();
         let config = cache.get_config().unwrap_or(&default_config);
 
         let mut formatter = lelwel::frontend::format::LlwFormatter::new();
 
-        // 应用配置选项
+        // Apply configuration options
         if let Some(width) = config.format_max_line_width {
             formatter = formatter.with_max_line_width(width);
         }
@@ -107,21 +107,21 @@ impl RequestHandler for Formatting {
             formatter = formatter.with_align_operators(align);
         }
 
-        // 格式化文档（根据配置选择是否保留注释）
+        // Format document (choose whether to preserve comments based on configuration)
         let formatted_text = if config.format_preserve_comments.unwrap_or(false) {
-            // 使用注释保留格式化
+            // Use comment-preserving formatting
             formatter.format_file_with_comments(document, &cst, file)
         } else {
-            // 使用基本格式化
+            // Use basic formatting
             formatter.format_file(&cst, file)
         };
 
-        // 如果格式化后的文本与原始文本相同，返回空编辑
+        // If formatted text is same as original, return empty edits
         if formatted_text == *document {
             return Some(vec![]);
         }
 
-        // 创建文本编辑，替换整个文档
+        // Create text edit to replace entire document
         let text_edit = TextEdit {
             range: ls_types::Range {
                 start: ls_types::Position {
@@ -146,7 +146,7 @@ trait NotificationHandler: ls_types::notification::Notification {
 
 impl NotificationHandler for ls_types::notification::DidChangeConfiguration {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification> {
-        // 处理配置变更
+        // Handle configuration changes
         if let Some(settings) = params.settings.get("lelwel")
             && let Ok(config) = serde_json::from_value::<lelwel::ide::LspConfig>(settings.clone())
         {
@@ -268,23 +268,23 @@ impl RequestHandler for Completion {
         let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
 
-        // 使用公共API获取文档内容
+        // Get document content using public API
         let document = cache.get_document(&uri)?;
 
-        // 创建SimpleFile用于位置转换
+        // Create SimpleFile for position conversion
         use codespan_reporting::files::SimpleFile;
         let file = SimpleFile::new(uri.as_str(), document.as_str());
 
-        // 使用现有的位置转换函数
+        // Use existing position conversion function
         let offset = lelwel::ide::compat::position_to_offset(&file, &pos);
 
         let mut diags = vec![];
         let cst = Parser::new(document, &mut diags).parse(&mut diags);
 
-        // 使用正确的语义分析API
+        // Use correct semantic analysis API
         let sema = SemanticPass::run(&cst, &mut diags);
 
-        // 使用增强的补全函数，包含格式化建议
+        // Use enhanced completion function with formatting suggestions
         Some(completion::enhanced_completion(&cst, offset, &sema))
     }
 }
