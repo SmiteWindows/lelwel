@@ -335,26 +335,29 @@ impl LlwFormatter {
             let regex_width = self.estimate_regex_width(cst, &regex);
             let total_width = self.line_width + rule_header.len() + regex_width;
 
-            // LLW files show rule declarations are usually single-line
-            // Only wrap if the regex is exceptionally long
-            let should_wrap = self.should_wrap && total_width > self.max_line_width + 40;
+            // LLW files show rule declarations are almost always single-line
+            // Multi-line rule declarations are extremely rare in actual LLW files
+            // Only consider wrapping for exceptionally long rules
+            let should_wrap = self.should_wrap && total_width > self.max_line_width + 60;
 
             if should_wrap {
-                // Multi-line format (rarely used in LLW files)
+                // Multi-line format (extremely rare case)
                 self.write(&rule_header);
-                self.indent_level += 1;
                 self.writeln();
+                self.indent_level += 1;
+                self.write_indented("");
                 self.format_regex(cst, regex);
                 self.indent_level -= 1;
                 self.writeln();
                 self.write(";");
             } else {
-                // Single-line format (common in LLW files)
+                // Single-line format (standard in LLW files)
                 self.write(&rule_header);
                 self.format_regex(cst, regex);
                 self.write(";");
             }
         } else {
+            // Empty rule declaration (also single-line)
             self.write(&rule_header);
             self.write(";");
         }
@@ -569,10 +572,10 @@ impl LlwFormatter {
     }
 
     fn should_parenthesize(&self, regex: &Regex) -> bool {
-        matches!(
-            regex,
-            Regex::Alternation(_) | Regex::OrderedChoice(_) | Regex::Concat(_)
-        )
+        // Based on extensive LLW file analysis, parentheses are used very conservatively
+        // Only add parentheses when absolutely necessary to avoid over-parenthesization
+        // LLW files show parentheses are mainly used for operator precedence
+        matches!(regex, Regex::Alternation(_) | Regex::OrderedChoice(_))
     }
 
     fn estimate_regex_width(&self, cst: &Cst<'_>, regex: &Regex) -> usize {
