@@ -2,8 +2,7 @@
 
 use std::error::Error;
 
-use lelwel::frontend::ast::{AstNode, File};
-use lelwel::frontend::parser::{NodeRef, Parser};
+use lelwel::frontend::parser::Parser;
 use lelwel::frontend::sema::SemanticPass;
 use lelwel::ide::Cache;
 use lelwel::ide::completion;
@@ -66,77 +65,51 @@ impl RequestHandler for Formatting {
         let mut diags = vec![];
         let cst = lelwel::frontend::parser::Parser::new(document, &mut diags).parse(&mut diags);
 
-        // Get file AST
-        let file = match File::cast(&cst, NodeRef::ROOT) {
-            Some(file) => file,
-            None => return Some(vec![]), // Unable to parse, return empty edits
-        };
-
-        // Apply configuration (fix lifetime issues)
+        // Apply configuration
         let default_config = lelwel::ide::LspConfig::default();
         let config = cache.get_config().unwrap_or(&default_config);
 
-        let mut formatter = lelwel::frontend::format::LlwFormatter::new();
+        // Create format configuration
+        let format_config = lelwel::frontend::format::FormatConfig {
+            preserve_comments: config.format_preserve_comments,
+            max_line_width: config.format_max_line_width,
+            indent_size: config.format_indent_size,
+            enable_wrapping: config.format_enable_wrapping,
+            compact_concat: config.format_compact_concat,
+            align_operators: config.format_align_operators,
+        };
 
-        // Apply configuration options
-        if let Some(width) = config.format_max_line_width {
-            formatter = formatter.with_max_line_width(width);
-        }
+        // Use the new config-based formatting function
+        let formatted =
+            lelwel::frontend::format::format_llw_with_config(document, &cst, format_config);
 
-        if let Some(size) = config.format_indent_size {
-            formatter = formatter.with_indent_size(size);
-        }
+        // Create text edit if formatting succeeded
+        if let Some(formatted_text) = formatted {
+            // If formatted text is same as original, return empty edits
+            if formatted_text == *document {
+                return Some(vec![]);
+            }
 
-        if let Some(wrapping) = config.format_enable_wrapping {
-            formatter = formatter.with_wrapping(wrapping);
-        }
+            // Create text edit to replace entire document
+            let text_edit = TextEdit {
+                range: ls_types::Range {
+                    start: ls_types::Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: ls_types::Position {
+                        line: document.lines().count() as u32,
+                        character: 0,
+                    },
+                },
+                new_text: formatted_text,
+            };
 
-        if let Some(compact) = config.format_compact_concat {
-            formatter = formatter.with_compact_concat(compact);
-        }
-
-        if let Some(align) = config.format_align_operators {
-            formatter = formatter.with_align_operators(align);
-        }
-
-        if let Some(compact) = config.format_compact_concat {
-            formatter = formatter.with_compact_concat(compact);
-        }
-
-        if let Some(align) = config.format_align_operators {
-            formatter = formatter.with_align_operators(align);
-        }
-
-        // Format document (choose whether to preserve comments based on configuration)
-        let formatted_text = if config.format_preserve_comments.unwrap_or(false) {
-            // Use comment-preserving formatting
-            formatter.format_file_with_comments(document, &cst, file)
+            Some(vec![text_edit])
         } else {
-            // Use basic formatting
-            formatter.format_file(&cst, file)
-        };
-
-        // If formatted text is same as original, return empty edits
-        if formatted_text == *document {
-            return Some(vec![]);
+            // Formatting failed, return empty edits
+            Some(vec![])
         }
-
-        // Create text edit to replace entire document
-        let text_edit = TextEdit {
-            range: ls_types::Range {
-                start: ls_types::Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: ls_types::Position {
-                    line: document.lines().count() as u32,
-                    character: 0,
-                },
-            },
-            new_text: formatted_text,
-        };
-
-        Some(vec![text_edit])
     }
 }
 

@@ -176,7 +176,7 @@ impl Cache {
         // 使用配置化的格式化函数
         // 逻辑已移动到format.rs模块中，保持代码模块化
         let format_config = FormatConfig {
-            preserve_comments: config.format_preserve_comments.unwrap_or(false),
+            preserve_comments: config.format_preserve_comments,
             max_line_width: config.format_max_line_width,
             indent_size: config.format_indent_size,
             enable_wrapping: config.format_enable_wrapping,

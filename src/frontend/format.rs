@@ -1047,7 +1047,7 @@ pub fn format_llw_with_comments(source: &str, cst: &Cst<'_>) -> Option<String> {
 #[derive(Debug, Clone, Default)]
 pub struct FormatConfig {
     /// 是否保留注释
-    pub preserve_comments: bool,
+    pub preserve_comments: Option<bool>,
     /// 最大行宽限制
     pub max_line_width: Option<usize>,
     /// 缩进大小
@@ -1115,11 +1115,12 @@ pub fn format_llw_with_config(source: &str, cst: &Cst<'_>, config: FormatConfig)
         }
 
         // 根据注释保留选项选择格式化方法
-        if config.preserve_comments {
-            Some(formatter.format_file_with_comments(source, cst, file))
+        // 使用更简洁的条件表达式
+        Some(if config.preserve_comments.unwrap_or(false) {
+            formatter.format_file_with_comments(source, cst, file)
         } else {
-            Some(formatter.format_file(cst, file))
-        }
+            formatter.format_file(cst, file)
+        })
     } else {
         None // 无效的语法树，无法格式化
     }

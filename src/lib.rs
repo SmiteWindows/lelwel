@@ -138,14 +138,19 @@ pub fn format_llw_file(
     // Parse the llw file
     let cst = frontend::parser::Parser::new(&source, &mut diags).parse(&mut diags);
 
-    // Format the llw file
-    let formatted = if preserve_comments {
-        // Use comment-preserving formatter
-        frontend::format::format_llw_with_comments(&source, &cst).unwrap_or_default()
-    } else {
-        // Use basic formatter
-        frontend::format::format_llw(&cst).unwrap_or_default()
+    // Create format configuration with default options
+    let format_config = frontend::format::FormatConfig {
+        preserve_comments: Some(preserve_comments),
+        max_line_width: None,  // 使用默认值
+        indent_size: None,     // 使用默认值
+        enable_wrapping: None, // 使用默认值
+        compact_concat: None,  // 使用默认值
+        align_operators: None, // 使用默认值
     };
+
+    // Format the llw file using the new config-based formatter
+    let formatted =
+        frontend::format::format_llw_with_config(&source, &cst, format_config).unwrap_or_default();
 
     // Handle output using iterator-style pattern matching
     match Path::new(output) {
