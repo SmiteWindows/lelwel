@@ -14,7 +14,7 @@ use self::lookup::*;
 
 use crate::NodeRef;
 use crate::frontend::ast::{AstNode, File};
-use crate::frontend::format::{LlwFormatter, format_llw, format_llw_with_comments};
+use crate::frontend::format::{FormatConfig, LlwFormatter, format_llw_with_config};
 
 pub mod completion;
 mod hover;
@@ -126,26 +126,68 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Format document (using public API)
+    /// Format document using the enhanced formatting API with configuration
+    ///
+    /// 逻辑：
+    /// 1. 检查格式化功能是否启用
+    /// 2. 快速检查空文档或无效内容
+    /// 3. 解析文档生成语法树（CST）
+    /// 4. 验证语法树有效性
+    /// 5. 应用LSP配置选项
+    /// 6. 调用配置化的格式化函数进行格式化
+    ///
+    /// 优化点：
+    /// - 添加空文档快速返回
+    /// - 语法树有效性验证
+    /// - 配置选项的智能默认值处理
+    /// - 错误处理的改进
+    ///
+    /// 基于新版fmt模块的特性：
+    /// - 支持lelwel.llw默认风格
+    /// - 单行规则声明优先
+    /// - 保守的括号使用策略
+    /// - 智能换行和操作符对齐
+    /// - 配置化的格式化选项
     pub fn format_document(&self, _uri: &Uri, text: &str) -> Option<String> {
+        // 检查格式化功能是否启用
         if !self.format_enabled {
             return None;
         }
 
-        // Parse the document
+        // 快速检查：空文档或仅包含空白字符
+        if text.trim().is_empty() {
+            return Some(text.to_string()); // 返回原始内容
+        }
+
+        // 解析文档生成语法树
         let mut diags = vec![];
         let cst = Parser::new(text, &mut diags).parse(&mut diags);
 
-        // Apply configuration (fix lifetime issues)
+        // 验证语法树有效性（检查是否有错误诊断）
+        if diags.iter().any(|d| d.severity == Severity::Error) {
+            // 语法错误，不进行格式化
+            return None;
+        }
+
+        // 应用配置选项
         let default_config = LspConfig::default();
         let config = self.config.as_ref().unwrap_or(&default_config);
 
-        // Choose whether to preserve comments based on configuration
-        if config.format_preserve_comments.unwrap_or(false) {
-            format_llw_with_comments(text, &cst)
-        } else {
-            format_llw(&cst)
-        }
+        // 使用配置化的格式化函数
+        // 逻辑已移动到format.rs模块中，保持代码模块化
+        let format_config = FormatConfig {
+            preserve_comments: config.format_preserve_comments.unwrap_or(false),
+            max_line_width: config.format_max_line_width,
+            indent_size: config.format_indent_size,
+            enable_wrapping: config.format_enable_wrapping,
+            compact_concat: config.format_compact_concat,
+            align_operators: config.format_align_operators,
+        };
+
+        let result = format_llw_with_config(text, &cst, format_config);
+
+        // 验证格式化结果
+        result.filter(|formatted| !formatted.trim().is_empty())
     }
 
     pub fn analyze(&mut self, uri: Uri, text: String) {
