@@ -3,7 +3,7 @@
 use crate::{NodeRef, Parser, SemanticPass, Span, backend::format::format};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
-use lsp_types::*;
+use ls_types::*;
 use rustc_hash::FxHashMap;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
@@ -24,11 +24,11 @@ struct Analyzer {
 
 #[derive(Default)]
 pub struct Cache {
-    analyzers: FxHashMap<Url, Analyzer>,
+    analyzers: FxHashMap<Uri, Analyzer>,
 }
 
 impl Cache {
-    pub fn analyze(&mut self, uri: Url, text: String) {
+    pub fn analyze(&mut self, uri: Uri, text: String) {
         let (req_tx, req_rx) = mpsc::channel::<Request>();
         let (noti_tx, noti_rx) = mpsc::channel::<Notification>();
         let key = uri.clone();
@@ -43,13 +43,13 @@ impl Cache {
             },
         );
     }
-    pub fn invalidate(&mut self, uri: &Url) {
+    pub fn invalidate(&mut self, uri: &Uri) {
         if let Some(analyzer) = self.analyzers.remove(uri) {
             analyzer.req_tx.send(Request::Cancel).unwrap();
             analyzer.handle.join().unwrap();
         }
     }
-    pub fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
+    pub fn get_diagnostics(&mut self, uri: &Uri) -> Vec<Diagnostic> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::Diagnostic).unwrap();
@@ -59,7 +59,7 @@ impl Cache {
             vec![]
         }
     }
-    pub fn hover(&mut self, uri: &Url, pos: Position) -> Option<(String, Range)> {
+    pub fn hover(&mut self, uri: &Uri, pos: Position) -> Option<(String, Range)> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::Hover(pos)).unwrap();
@@ -69,7 +69,7 @@ impl Cache {
             None
         }
     }
-    pub fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Location> {
+    pub fn goto_definition(&mut self, uri: &Uri, pos: Position) -> Option<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer.req_tx.send(Request::GotoDefinition(pos)).unwrap();
@@ -79,7 +79,7 @@ impl Cache {
             None
         }
     }
-    pub fn references(&mut self, uri: &Url, pos: Position, with_def: bool) -> Vec<Location> {
+    pub fn references(&mut self, uri: &Uri, pos: Position, with_def: bool) -> Vec<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer
@@ -137,7 +137,7 @@ enum Notification {
 }
 
 fn analyze(
-    uri: Url,
+    uri: Uri,
     source: String,
     req: mpsc::Receiver<Request>,
     noti: mpsc::Sender<Notification>,
@@ -162,36 +162,47 @@ fn analyze(
                 noti.send(Notification::PublishDiagnostics(diags)).unwrap();
             }
             Request::Hover(pos) => {
-                let pos = compat::position_to_offset(&file, &pos);
-                let res = hover(&cst, &sema, pos)
-                    .map(|(msg, span)| (msg, compat::span_to_range(&file, &span)));
+                let pos = codespan_lsp::position_to_byte_index(&file, (), &pos).unwrap();
+                let res = hover(&cst, &sema, pos).map(|(msg, span)| {
+                    (
+                        msg,
+                        codespan_lsp::byte_span_to_range(&file, (), span.clone()).unwrap(),
+                    )
+                });
                 noti.send(Notification::Hover(res)).unwrap();
             }
             Request::GotoDefinition(pos) => {
-                let pos = compat::position_to_offset(&file, &pos);
+                let pos = codespan_lsp::position_to_byte_index(&file, (), &pos).unwrap();
                 let location = lookup_definition(&cst, &sema, pos, &uri, &file, &parser_path);
                 noti.send(Notification::GotoDefinition(location)).unwrap();
             }
             Request::References(pos, with_def) => {
-                let pos = compat::position_to_offset(&file, &pos);
+                let pos = codespan_lsp::position_to_byte_index(&file, (), &pos).unwrap();
                 let ranges = lookup_references(&cst, &sema, pos, with_def)
                     .into_iter()
                     .map(|node| {
-                        Location::new(uri.clone(), compat::span_to_range(&file, &cst.span(node)))
+                        Location::new(
+                            uri.clone(),
+                            codespan_lsp::byte_span_to_range(&file, (), cst.span(node)).unwrap(),
+                        )
                     })
                     .collect();
                 noti.send(Notification::References(ranges)).unwrap();
             }
             Request::Completion(params) => {
-                let pos =
-                    compat::position_to_offset(&file, &params.text_document_position.position);
+                let pos = codespan_lsp::position_to_byte_index(
+                    &file,
+                    (),
+                    &params.text_document_position.position,
+                )
+                .unwrap();
                 noti.send(Notification::Completion(completion(&cst, pos, &sema)))
                     .unwrap();
             }
             Request::Formatting(_params) => {
                 let formatted_source = format(&cst);
                 noti.send(Notification::Formatting(Some(vec![TextEdit::new(
-                    compat::span_to_range(&file, &cst.span(NodeRef::ROOT)),
+                    codespan_lsp::byte_span_to_range(&file, (), cst.span(NodeRef::ROOT)).unwrap(),
                     formatted_source,
                 )])))
                 .unwrap();
@@ -206,18 +217,21 @@ fn analyze(
 fn to_lsp_related(
     file: &SimpleFile<&str, &str>,
     span: &Span,
-    uri: &Url,
+    uri: &Uri,
     msg: &str,
 ) -> DiagnosticRelatedInformation {
     DiagnosticRelatedInformation {
-        location: Location::new(uri.clone(), compat::span_to_range(file, span)),
+        location: Location::new(
+            uri.clone(),
+            codespan_lsp::byte_span_to_range(file, (), span.clone()).unwrap(),
+        ),
         message: msg.to_string(),
     }
 }
 
 fn to_lsp_diag(
     file: &SimpleFile<&str, &str>,
-    uri: &Url,
+    uri: &Uri,
     diag: &super::frontend::parser::Diagnostic,
 ) -> Diagnostic {
     let related = diag
@@ -245,8 +259,8 @@ fn to_lsp_diag(
     Diagnostic::new(
         diag.labels
             .first()
-            .map_or(lsp_types::Range::default(), |label| {
-                compat::span_to_range(file, &label.range)
+            .map_or(ls_types::Range::default(), |label| {
+                codespan_lsp::byte_span_to_range(file, (), label.range.clone()).unwrap()
             }),
         Some(match diag.severity {
             Severity::Error | Severity::Bug => DiagnosticSeverity::ERROR,
@@ -278,27 +292,4 @@ fn related_as_hints(diags: &[Diagnostic]) -> Vec<Diagnostic> {
         }
     }
     hints
-}
-
-/// required functions due to different versions of lsp-types in codespan
-mod compat {
-    use crate::Span;
-    use codespan_reporting::files::SimpleFile;
-
-    pub fn position_to_offset(file: &SimpleFile<&str, &str>, pos: &lsp_types::Position) -> usize {
-        codespan_lsp::position_to_byte_index(
-            file,
-            (),
-            &lsp_types_old::Position::new(pos.line, pos.character),
-        )
-        .unwrap()
-    }
-
-    pub fn span_to_range(file: &SimpleFile<&str, &str>, span: &Span) -> lsp_types::Range {
-        let range = codespan_lsp::byte_span_to_range(file, (), span.clone()).unwrap();
-        lsp_types::Range::new(
-            lsp_types::Position::new(range.start.line, range.start.character),
-            lsp_types::Position::new(range.end.line, range.end.character),
-        )
-    }
 }

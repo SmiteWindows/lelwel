@@ -8,18 +8,17 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
-
+rust-version = "1.93"
 [lints.rust]
 rust-2018-idioms = { level = "deny" }
 
 [dependencies]
-logos = "0.16"
-codespan-reporting = "0.13"
+logos = { git = "https://github.com/SmiteWindows/logos" }
+codespan-reporting = { git = "https://github.com/SmiteWindows/codespan", branch = "master" }
+codespan-lsp = { git = "https://github.com/SmiteWindows/codespan", branch = "master", optional = true }
+ls-types = { git = "https://github.com/SmiteWindows/ls-types", optional = true }
 rustc-hash = "2.1"
-codespan-lsp = { version = "0.13", optional = true }
 clap = { version = "4.5", features = ["cargo"], optional = true }
-lsp-types = { version = "0.95", optional = true }
-lsp-types_old = { package = "lsp-types", version = "0.91", optional = true }
 lsp-server = { version = "0.7", optional = true }
 serde = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
@@ -28,7 +27,7 @@ wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 cli = ["clap", "dprint-core"]
-lsp = ["lsp-server", "codespan-lsp", "lsp-types", "lsp-types_old", "serde", "serde_json", "dprint-core"]
+lsp = ["lsp-server", "codespan-lsp", "ls-types", "serde", "serde_json", "dprint-core"]
 wasm = ["wasm-bindgen"]
 
 [[bin]]

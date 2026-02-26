@@ -75,9 +75,15 @@ checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
 name = "bitflags"
-version = "1.3.2"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
+checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
+
+[[package]]
+name = "borrow-or-share"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 
 [[package]]
 name = "bumpalo"
@@ -124,11 +130,10 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 [[package]]
 name = "codespan-lsp"
 version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b93929a224896b211d7a3a6121e3819584ef0d1413e5dbb1eaee8492ffffc40"
+source = "git+https://github.com/SmiteWindows/codespan?branch=master#e10c6a3fc4697dc55ae52bd60a08a6be74cd81a2"
 dependencies = [
- "codespan-reporting",
- "lsp-types 0.91.1",
+ "codespan-reporting 0.13.1 (git+https://github.com/SmiteWindows/codespan?branch=master)",
+ "ls-types",
  "url",
 ]
 
@@ -137,6 +142,16 @@ name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
+dependencies = [
+ "serde",
+ "termcolor",
+ "unicode-width",
+]
+
+[[package]]
+name = "codespan-reporting"
+version = "0.13.1"
+source = "git+https://github.com/SmiteWindows/codespan?branch=master#e10c6a3fc4697dc55ae52bd60a08a6be74cd81a2"
 dependencies = [
  "serde",
  "termcolor",
@@ -195,6 +210,17 @@ name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
+[[package]]
+name = "fluent-uri"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc74ac4d8359ae70623506d512209619e5cf8f347124910440dbc221714b328e"
+dependencies = [
+ "borrow-or-share",
+ "ref-cast",
+ "serde",
+]
 
 [[package]]
 name = "fnv"
@@ -396,12 +422,11 @@ version = "0.10.2"
 dependencies = [
  "clap",
  "codespan-lsp",
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (git+https://github.com/SmiteWindows/codespan?branch=master)",
  "dprint-core",
- "logos",
+ "logos 0.16.1 (git+https://github.com/SmiteWindows/logos)",
+ "ls-types",
  "lsp-server",
- "lsp-types 0.91.1",
- "lsp-types 0.95.1",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -412,9 +437,9 @@ dependencies = [
 name = "lelwel-brainfuck"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen",
 ]
 
@@ -422,9 +447,9 @@ dependencies = [
 name = "lelwel-c"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hash",
  "wasm-bindgen",
 ]
@@ -433,18 +458,18 @@ dependencies = [
 name = "lelwel-calc"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "lelwel-json"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen",
 ]
 
@@ -452,9 +477,9 @@ dependencies = [
 name = "lelwel-l"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen",
 ]
 
@@ -462,9 +487,9 @@ dependencies = [
 name = "lelwel-lua"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen",
 ]
 
@@ -472,9 +497,9 @@ dependencies = [
 name = "lelwel-oberon0"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen",
 ]
 
@@ -482,7 +507,7 @@ dependencies = [
 name = "lelwel-python2"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "herring",
  "lelwel",
  "wasm-bindgen",
@@ -492,7 +517,7 @@ dependencies = [
 name = "lelwel-toml"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "herring",
  "lelwel",
  "wasm-bindgen",
@@ -502,9 +527,9 @@ dependencies = [
 name = "lelwel-wgsl"
 version = "0.0.0"
 dependencies = [
- "codespan-reporting",
+ "codespan-reporting 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lelwel",
- "logos",
+ "logos 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hash",
  "wasm-bindgen",
 ]
@@ -527,7 +552,15 @@ version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb2c55a318a87600ea870ff8c2012148b44bf18b74fad48d0f835c38c7d07c5f"
 dependencies = [
- "logos-derive",
+ "logos-derive 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "logos"
+version = "0.16.1"
+source = "git+https://github.com/SmiteWindows/logos#e5948627534d83ab7c1e2f842f940a49d10685b0"
+dependencies = [
+ "logos-derive 0.16.1 (git+https://github.com/SmiteWindows/logos)",
 ]
 
 [[package]]
@@ -545,12 +578,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "logos-codegen"
+version = "0.16.1"
+source = "git+https://github.com/SmiteWindows/logos#e5948627534d83ab7c1e2f842f940a49d10685b0"
+dependencies = [
+ "fnv",
+ "proc-macro2",
+ "quote",
+ "regex-automata",
+ "regex-syntax",
+ "syn",
+]
+
+[[package]]
 name = "logos-derive"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d3a9855747c17eaf4383823f135220716ab49bea5fbea7dd42cc9a92f8aa31"
 dependencies = [
- "logos-codegen",
+ "logos-codegen 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "logos-derive"
+version = "0.16.1"
+source = "git+https://github.com/SmiteWindows/logos#e5948627534d83ab7c1e2f842f940a49d10685b0"
+dependencies = [
+ "logos-codegen 0.16.1 (git+https://github.com/SmiteWindows/logos)",
+]
+
+[[package]]
+name = "ls-types"
+version = "0.0.3"
+source = "git+https://github.com/SmiteWindows/ls-types#d31170b8dd082b33b46d8235e24670ea99282aba"
+dependencies = [
+ "bitflags",
+ "fluent-uri",
+ "percent-encoding",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -564,32 +630,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.91.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2368312c59425dd133cb9a327afee65be0a633a8ce471d248e2202a48f8f68ae"
-dependencies = [
- "bitflags",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.95.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e34d33a8e9b006cd3fc4fe69a921affa097bae4bb65f76271f4644f9a334365"
-dependencies = [
- "bitflags",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
 ]
 
 [[package]]
@@ -641,6 +681,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21b2ebcf727b7760c461f091f9f0f539b77b8e87f2fd88131e7f1b433b3cece4"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "ref-cast"
+version = "1.0.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f354300ae66f76f1c85c5f84693f0ce81d747e2c3f21a45fef496d89c960bf7d"
+dependencies = [
+ "ref-cast-impl",
+]
+
+[[package]]
+name = "ref-cast-impl"
+version = "1.0.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7186006dcb21920990093f30e3dea63b7d6e977bf1256be20c3563a5db070da"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -713,17 +773,6 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -807,7 +856,6 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
- "serde_derive",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 use codespan_reporting::files::{Files, SimpleFile};
-use lsp_types::{Location, Url};
+use ls_types::{Location, Uri};
 
 use crate::frontend::lexer::Token;
 use crate::frontend::parser::Span;
@@ -50,7 +50,7 @@ pub fn lookup_definition(
     cst: &Cst<'_>,
     sema: &SemanticData<'_>,
     pos: usize,
-    uri: &Url,
+    uri: &Uri,
     file: &SimpleFile<&str, &str>,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
@@ -62,7 +62,7 @@ pub fn lookup_definition(
         } else {
             sema.decl_bindings.get(&node).map(|node| Location {
                 uri: uri.clone(),
-                range: super::compat::span_to_range(file, &cst.span(*node)),
+                range: codespan_lsp::byte_span_to_range(file, (), cst.span(*node)).unwrap(),
             })
         }
     })
@@ -98,20 +98,20 @@ fn lookup_parser_impl_definition(
     number: &str,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
-    let uri = Url::from_file_path(parser_path).ok()?;
+    let uri = Uri::from_file_path(parser_path)?;
     let source = std::fs::read_to_string(parser_path).ok()?;
     let file = SimpleFile::new(parser_path.to_str()?, source.as_str());
     source
         .find(&format!("fn {kind}_{rule_name}_{number}"))
         .and_then(|offset| file.location((), offset).ok())
         .map(|loc| {
-            let pos = lsp_types::Position::new(
+            let pos = ls_types::Position::new(
                 (loc.line_number - 1) as u32,
                 (loc.column_number - 1) as u32,
             );
             Location {
                 uri,
-                range: lsp_types::Range::new(pos, pos),
+                range: ls_types::Range::new(pos, pos),
             }
         })
 }
